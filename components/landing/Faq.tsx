@@ -12,24 +12,16 @@ const ITEMS = [
     a: "No. The score comes from three weighted rules and one calibration constant: about 45 study hours to move 100 SAT points. Nothing is generated. The same answers always return the same report, and the arithmetic is printed on it.",
   },
   {
+    q: "Do I have to answer more than five questions?",
+    a: "No. Five answers produce the full report. On the report, three optional questions (practice tests taken, weakest sub-topic, running out of time) each apply one more rule and raise the accuracy meter from 70% by 10%. Skip them and nothing is missing.",
+  },
+  {
     q: "What happens to my answers?",
-    a: "They are stored anonymously: the five answers, any optional refinement answers, and session timing (time per question, tab switches, changed answers). No name, no email, no account. None of the timing changes your score.",
-  },
-  {
-    q: "Why does it track time on each question?",
-    a: "The SAT is a timed test, so how you take a short check says something about focus. The report shows it back to you as a Focused / A bit distracted / Distracted badge. It is feedback only and never touches the readiness score.",
-  },
-  {
-    q: "What does the accuracy percentage mean?",
-    a: "Five answers give a 70% accurate read. On the report, three optional questions (practice tests taken, weakest sub-topic, running out of time) each add 10% and apply one more rule, re-scoring the report live.",
+    a: "They are saved anonymously in a database: the five answers, the report, any optional answers, and how you took the check (time per question, tab switches). No name, no email, no account. The timing is shown back to you as a focus badge and never changes the score.",
   },
   {
     q: "How accurate is the projection?",
     a: "It is a planning estimate, not a prediction. It assumes your reported hours hold and that practice is deliberate. Its job is to show whether the plan is even arithmetically possible, which is where most SAT plans quietly fail.",
-  },
-  {
-    q: "I have never taken a practice test. Can I still use it?",
-    a: "Yes, and the report says so. A careful baseline of 1050 is assumed, the score is discounted, and your first move is to sit one full timed test.",
   },
 ];
 
@@ -43,7 +35,7 @@ export function Faq() {
         <SectionHead
           eyebrow="Questions"
           title="Before you start."
-          lede="Short answers. The long ones are printed on the report."
+          lede="Short answers. The arithmetic is printed on the report."
           className="lg:sticky lg:top-24 lg:self-start"
         />
         <ul className="flex flex-col gap-3">

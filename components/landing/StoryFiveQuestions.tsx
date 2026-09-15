@@ -95,7 +95,7 @@ function StepText({ step }: { step: number }) {
               {done ? "A score, a band and a week of study, instantly." : QUESTIONS[step].prompt}
             </p>
             <p className="mt-1 text-caption text-ink-2 sm:mt-2 sm:text-lede">
-              {done ? "No email wall. Then three optional questions sharpen the report." : WHY[step]}
+              {done ? "Right after question 5, no email wall. Three more questions on it are optional." : WHY[step]}
             </p>
           </motion.div>
         </AnimatePresence>

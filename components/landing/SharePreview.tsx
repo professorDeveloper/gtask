@@ -35,10 +35,10 @@ export function SharePreview({
         <SectionHead
           eyebrow="What comes back · sample"
           title="A report you will actually want to share."
-          lede="A card for your group chat, how you took the check, and a real week of study with a countdown to test day."
+          lede="A card for your group chat, how you took the check, and a week of study counting down to test day."
         />
 
-        <div className="mt-12 grid items-center gap-12 lg:grid-cols-[0.9fr_1.1fr] lg:gap-14">
+        <div className="mt-10 grid items-center gap-8 lg:mt-12 lg:grid-cols-[0.9fr_1.1fr] lg:gap-14">
           <ShareCard sample={sample} />
           <div className="flex min-w-0 flex-col gap-4">
             <SessionCard session={session} perQuestionMs={perQuestionMs} />
@@ -52,7 +52,7 @@ export function SharePreview({
 
 function ShareCard({ sample }: { sample: Report }) {
   return (
-    <div className="relative mx-auto w-full max-w-[330px] py-4">
+    <div className="relative mx-auto w-full max-w-[290px] py-4 sm:max-w-[330px]">
       <motion.div
         initial={{ opacity: 0, rotate: -10, y: 48 }}
         whileInView={{ opacity: 1, rotate: -3, y: 0 }}

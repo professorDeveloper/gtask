@@ -130,7 +130,7 @@ export function ReportView({
           </ResultSection>
 
           <div id="share" className="scroll-mt-20">
-            <ShareActions id={id} report={report} />
+            <ShareActions id={id} report={report} createdAt={createdAt} />
             <div className="mt-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
               <Button href="/check" icon="refresh" variant="ghost" size="md" className="-ml-3">
                 Run it again

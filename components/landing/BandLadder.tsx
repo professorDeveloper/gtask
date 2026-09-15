@@ -61,18 +61,18 @@ function Step({ band, index, progress }: { band: Band; index: number; progress: 
           <span className="tnum font-mono text-caption text-ink-2">
             {from}–{band.max}
           </span>
-          {confetti && (
+          {confetti ? (
             <span className="inline-flex rotate-6 items-center gap-1 rounded-full bg-sunny px-2 py-0.5 text-micro font-bold text-ink elev-1">
               <Icon name="confetti" size={14} /> Confetti
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1 rounded-full bg-surface-2 px-2 py-0.5 text-micro font-semibold text-ink-2">
+              <Icon name="coffee" size={14} /> Pep talk
             </span>
           )}
         </div>
         <h3 className="mt-3 text-title font-bold">{band.name}</h3>
         <p className="mt-2 text-body text-ink-2">{band.blurb}</p>
-        <p className="mt-4 flex items-center gap-1.5 text-micro text-ink-3">
-          <Icon name={confetti ? "sparkle" : "coffee"} size={15} />
-          {confetti ? "Revealed with a celebration" : "Revealed with a warm pep talk"}
-        </p>
       </article>
     </motion.li>
   );

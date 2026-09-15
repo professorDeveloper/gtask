@@ -56,7 +56,7 @@ export function FinalCta() {
           Start the check
           <Icon name="arrowRight" size={20} weight="bold" />
         </MotionLink>
-        <p className="relative mt-4 text-caption text-white/90">No account · about 60 seconds</p>
+        <p className="relative mt-4 text-caption text-white/90">5 questions · rules, not AI · no account</p>
       </div>
     </section>
   );

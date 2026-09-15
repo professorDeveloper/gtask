@@ -4,12 +4,15 @@ import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 import { motion } from "motion/react";
 import type { Report } from "@/lib/readiness/types";
+import { daysToTest } from "@/lib/readiness/countdown";
 import { Button } from "@/components/ui/Button";
 import { Icon, type IconName } from "@/components/ui/Icon";
 import { Eyebrow } from "@/components/ui/Surface";
 import { SPRING, TAP_SCALE, usePrefersReducedMotion } from "@/components/ui/motion";
 import { toast } from "@/components/ui/Toast";
 import { burst } from "@/components/ui/confetti";
+import { CardPreview, type CardPreviewData } from "./CardPreview";
+import { fetchCard, sameBytes, wait } from "./cardFile";
 import { shareTextFor, telegramShareUrl } from "./text";
 
 /**
@@ -18,25 +21,43 @@ import { shareTextFor, telegramShareUrl } from "./text";
  * when the device supports it) and three quick tiles — copy link,
  * Telegram, save image.
  *
- * The preview, the shared file and the saved file are the same fetched
- * bytes, so what the student sees is exactly what gets sent.
+ * The preview has two layers. An HTML twin of the card (CardPreview) paints
+ * with the page from the report on screen, so the block is never empty. The
+ * rendered PNG is fetched ahead of the tap (Safari drops the user gesture if
+ * navigator.share waits on the network) and cross-fades over it; that same
+ * file is what Share and Save send. If the PNG never arrives, the preview
+ * stays, Share and Copy send the link, and Save downloads straight from the
+ * image route.
  */
 
 type Busy = "share" | "save" | null;
+/** loading: first PNG on its way · updating: redrawing after a refinement · failed: gave up */
+type ImageState = "loading" | "ready" | "updating" | "failed";
 
 /** A refinement is saved after the score changes on screen; give the store this long to catch up. */
 const STALE_RETRIES = 4;
 const STALE_WAIT_MS = 700;
 
-export function ShareActions({ id, report }: { id: string; report: Report }) {
+const SITE_HOST = (() => {
+  try {
+    return new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "https://gtask.vercel.app").host;
+  } catch {
+    return "gtask.vercel.app";
+  }
+})();
+
+export function ShareActions({ id, report, createdAt }: { id: string; report: Report; createdAt?: string }) {
   const reduce = usePrefersReducedMotion();
   const [busy, setBusy] = useState<Busy>(null);
   const [copied, setCopied] = useState(false);
   const [saved, setSaved] = useState(false);
-  const [preview, setPreview] = useState<string | null>(null);
-  const [updating, setUpdating] = useState(true);
+  const [png, setPng] = useState<string | null>(null);
+  const [pngShown, setPngShown] = useState(false);
+  const [image, setImage] = useState<ImageState>("loading");
+  const [retryKey, setRetryKey] = useState(0);
   const [origin, setOrigin] = useState("");
   const fileRef = useRef<File | null>(null);
+  const fileVersion = useRef<string | null>(null);
   const shownScore = useRef<number | null>(null);
 
   /* the version key busts the card when a refinement changes the report */
@@ -47,42 +68,79 @@ export function ShareActions({ id, report }: { id: string; report: Report }) {
   const fileName = `gtask-report-${report.readiness}.png`;
   const score = report.readiness;
 
+  const card: CardPreviewData = {
+    readiness: report.readiness,
+    bandName: report.band.name,
+    tone: report.band.tone,
+    archetype: report.archetype,
+    baseline: report.baseline,
+    target: report.target,
+    gap: report.target - report.baseline,
+    measured: report.measured,
+    countdown: daysToTest({ weeks: report.weeks, booked: !report.flags.unbooked }, createdAt).label,
+    site: SITE_HOST,
+  };
+
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- origin is only known in the browser
     setOrigin(window.location.origin);
   }, []);
 
-  /* Fetch the card ahead of the tap: Safari drops the user gesture if
-     navigator.share waits on a network request. When the score moved but
-     the server still draws the old card (the refinement save is in
-     flight), wait and fetch again. */
+  /* A failed image gets another go when the connection comes back. */
   useEffect(() => {
-    let cancelled = false;
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- shows the shimmer while the new card loads
-    setUpdating(true);
+    if (image !== "failed") return;
+    const again = () => setRetryKey((k) => k + 1);
+    window.addEventListener("online", again);
+    return () => window.removeEventListener("online", again);
+  }, [image]);
+
+  /* Fetch the card. When the score moved but the server still draws the old
+     card (the refinement save is in flight), wait and fetch again. */
+  useEffect(() => {
+    const ctl = new AbortController();
+    const previous = fileRef.current;
+    const refining = previous !== null && fileVersion.current !== version;
+    /* the HTML twin already shows the new numbers; hide the stale PNG over it */
+    setImage(refining ? "updating" : "loading");
+    if (refining) setPngShown(false);
+
     (async () => {
-      const previous = fileRef.current;
       const scoreMoved = shownScore.current !== null && shownScore.current !== score;
       let file: File | null = null;
-      for (let attempt = 0; attempt <= STALE_RETRIES && !cancelled; attempt++) {
-        file = await fetchCard(`${cardPath}&n=${attempt}`, fileName);
+      for (let attempt = 0; attempt <= STALE_RETRIES; attempt++) {
+        file = await fetchCard(attempt ? `${cardPath}&n=${attempt}` : cardPath, fileName, ctl.signal);
+        if (ctl.signal.aborted) return;
         if (!file || !scoreMoved || !previous || !(await sameBytes(file, previous))) break;
-        await wait(STALE_WAIT_MS);
+        if (!(await wait(STALE_WAIT_MS, ctl.signal))) return;
       }
-      if (cancelled) return;
-      setUpdating(false);
-      if (!file) return;
+      if (ctl.signal.aborted) return;
+      if (!file) {
+        /* keep an older file for Share/Save only if it still matches the report */
+        if (fileVersion.current !== version) fileRef.current = null;
+        setImage("failed");
+        return;
+      }
       fileRef.current = file;
+      fileVersion.current = version;
       shownScore.current = score;
-      setPreview((old) => {
-        if (old) window.setTimeout(() => URL.revokeObjectURL(old), 1000);
+      setPng((old) => {
+        if (old) window.setTimeout(() => URL.revokeObjectURL(old), 1500);
         return URL.createObjectURL(file);
       });
+      setImage("ready");
     })();
-    return () => {
-      cancelled = true;
-    };
-  }, [cardPath, fileName, score]);
+
+    return () => ctl.abort();
+  }, [cardPath, fileName, score, version, retryKey]);
+
+  /* revoke the last object URL on unmount */
+  const pngRef = useRef(png);
+  useEffect(() => {
+    pngRef.current = png;
+  }, [png]);
+  useEffect(() => () => {
+    if (pngRef.current) URL.revokeObjectURL(pngRef.current);
+  }, []);
 
   const onCopy = async (el: HTMLElement) => {
     if (await copyText(reportUrl)) {
@@ -100,9 +158,14 @@ export function ShareActions({ id, report }: { id: string; report: Report }) {
     setBusy("share");
     try {
       const file = fileRef.current;
-      const withFile = file && navigator.canShare?.({ files: [file] });
+      let withFile = false;
+      try {
+        withFile = Boolean(file && navigator.canShare?.({ files: [file] }));
+      } catch {
+        withFile = false;
+      }
       await navigator.share(
-        withFile
+        withFile && file
           ? { files: [file], title: "My SAT readiness", text: `${text} ${reportUrl}` }
           : { title: "My SAT readiness", text, url: reportUrl },
       );
@@ -115,82 +178,104 @@ export function ShareActions({ id, report }: { id: string; report: Report }) {
     }
   };
 
-  const onSave = async () => {
-    setBusy("save");
-    try {
-      const file = fileRef.current ?? (await fetchCard(cardPath, fileName));
-      if (!file) throw new Error("no image");
-      const href = URL.createObjectURL(file);
-      const a = document.createElement("a");
+  /* Synchronous on purpose: no await before the download, so the tap still counts as a user gesture. */
+  const onSave = () => {
+    const file = fileRef.current;
+    const a = document.createElement("a");
+    let href: string | null = null;
+    if (file) {
+      href = URL.createObjectURL(file);
       a.href = href;
       a.download = file.name;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      window.setTimeout(() => URL.revokeObjectURL(href), 4000);
-      setSaved(true);
-      window.setTimeout(() => setSaved(false), 2400);
-      toast({ id: "share", title: "Image saved", description: "A 1080 × 1350 card, sized for stories and chats.", tone: "ready", icon: "download" });
-    } catch {
-      window.open(`/r/${id}/card?download=1`, "_blank", "noopener");
-    } finally {
-      setBusy(null);
+    } else {
+      /* no bytes in hand: let the route render and send it as an attachment */
+      a.href = `/r/${id}/card?v=${version}&download=1`;
+      a.download = fileName;
+      a.target = "_blank";
+      a.rel = "noopener";
     }
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    if (href) window.setTimeout(() => URL.revokeObjectURL(href), 4000);
+    setSaved(true);
+    window.setTimeout(() => setSaved(false), 2400);
+    toast({
+      id: "share",
+      title: file ? "Image saved" : "Downloading your card",
+      description: "A 1080 × 1350 card, sized for stories and chats.",
+      tone: "ready",
+      icon: "download",
+    });
+    if (!file) setRetryKey((k) => k + 1);
   };
 
   /* Same first render on server and client (reduced motion is only known
      after hydration); reduced motion just makes the entrance instant. */
-  const entrance = reduce ? { duration: 0 } : SPRING.pop;
+  const entrance = reduce ? { duration: 0 } : SPRING.gentle;
 
   return (
-    <section aria-labelledby="share-title" className="share-block overflow-hidden rounded-card border border-line bg-surface elev-1">
-      <div className="grid gap-0 sm:grid-cols-[minmax(0,15rem)_minmax(0,1fr)]">
-        {/* preview */}
-        <div className="mesh relative flex items-center justify-center px-6 pb-4 pt-8 sm:py-8">
+    <section aria-labelledby="share-title" className="share-block overflow-hidden rounded-card border border-line bg-surface elev-2">
+      <div className="grid sm:grid-cols-[minmax(0,17rem)_minmax(0,1fr)]">
+        {/* preview stage */}
+        <div className="share-stage relative flex flex-col items-center justify-center gap-5 border-b border-line px-6 pb-5 pt-9 sm:border-b-0 sm:border-r sm:px-7 sm:py-8">
           <motion.div
-            className="share-preview relative w-[62%] max-w-56 sm:w-full"
-            initial={{ opacity: 0, y: 24, rotate: -9, scale: 0.92 }}
-            whileInView={{ opacity: 1, y: 0, rotate: -3, scale: 1 }}
-            viewport={{ once: true, margin: "-10% 0px" }}
+            className="relative w-[58%] max-w-[13.5rem] sm:w-full sm:max-w-[13rem]"
+            initial={{ opacity: 0, y: 28, rotate: -8, scale: 0.94 }}
+            whileInView={{ opacity: 1, y: 0, rotate: 0, scale: 1 }}
+            viewport={{ once: true, margin: "-8% 0px" }}
             transition={entrance}
           >
-            <div className="relative aspect-[1080/1350] w-full overflow-hidden rounded-control elev-3 mesh-strong">
-              {preview && (
-                <Image
-                  src={preview}
-                  alt={`Share card: ${report.archetype}, ${report.readiness} out of 100, ${report.band.name} band`}
-                  width={1080}
-                  height={1350}
-                  unoptimized
-                  className={`h-full w-full object-cover transition-opacity duration-300 ${updating ? "opacity-60" : "opacity-100"}`}
-                />
-              )}
-              {updating && <span aria-hidden className="share-shimmer absolute inset-0" />}
+            <div className="share-card-tilt -rotate-2">
+              <figure
+                className="share-frame relative m-0 aspect-[1080/1350] w-full overflow-hidden rounded-[14px] elev-4"
+                aria-label={`Share card: ${report.archetype}, ${report.readiness} out of 100, ${report.band.name} band`}
+                role="img"
+              >
+                <CardPreview data={card} />
+                {png && (
+                  <Image
+                    src={png}
+                    alt=""
+                    width={1080}
+                    height={1350}
+                    unoptimized
+                    draggable={false}
+                    data-shown={pngShown && image !== "updating"}
+                    onLoad={() => setPngShown(true)}
+                    onError={() => setPngShown(false)}
+                    className="share-png absolute inset-0 h-full w-full object-cover"
+                  />
+                )}
+                {image === "updating" && <span aria-hidden className="share-shimmer absolute inset-0" />}
+              </figure>
             </div>
             <motion.span
               aria-hidden
-              className="absolute -right-3 -top-3 inline-flex min-h-8 items-center gap-1 rounded-full bg-sunny px-3 text-micro font-bold text-ink elev-2"
+              className="absolute -right-4 -top-4 inline-flex min-h-8 items-center gap-1 rounded-full bg-sunny px-3 text-micro font-bold text-ink elev-2"
               initial={{ scale: 0.4, rotate: 0, opacity: 0 }}
               whileInView={{ scale: 1, rotate: 8, opacity: 1 }}
               viewport={{ once: true }}
-              transition={reduce ? { duration: 0 } : { ...SPRING.pop, delay: 0.25 }}
+              transition={reduce ? { duration: 0 } : { ...SPRING.pop, delay: 0.35 }}
             >
               <Icon name="sparkle" size={14} weight="fill" />
               Story size
             </motion.span>
           </motion.div>
-          <span className="sr-only" aria-live="polite">{updating && preview ? "Updating your share card" : ""}</span>
+
+          <ImageStatus state={image} onRetry={() => setRetryKey((k) => k + 1)} />
         </div>
 
         {/* actions */}
-        <div className="flex flex-col gap-5 p-5 sm:p-6">
+        <div className="flex flex-col justify-center gap-5 p-5 sm:p-7">
           <div>
             <Eyebrow icon="share">Share</Eyebrow>
             <h3 id="share-title" className="mt-2 font-display text-title font-bold tracking-[-0.015em] text-balance text-ink">
               Your card is ready
             </h3>
-            <p className="mt-1 text-body text-ink-2 text-pretty">
-              Score, archetype and band on one poster. Send it to a friend, a parent or your tutor.
+            <p className="mt-1.5 text-body text-ink-2 text-pretty">
+              <span className="font-semibold text-ink">{report.archetype}</span>, {report.readiness}/100, {report.band.name} band. One
+              poster for your group chat, a parent or your tutor.
             </p>
           </div>
 
@@ -218,7 +303,7 @@ export function ShareActions({ id, report }: { id: string; report: Report }) {
               <Tile
                 label="Telegram"
                 href={origin ? telegramShareUrl(reportUrl, text) : undefined}
-                glyph={<Icon name="telegram" size={22} />}
+                glyph={<Icon name="telegram" size={20} />}
               />
             </li>
             <li>
@@ -226,7 +311,6 @@ export function ShareActions({ id, report }: { id: string; report: Report }) {
                 icon={saved ? "check" : "download"}
                 label={saved ? "Saved" : "Save image"}
                 done={saved}
-                busy={busy === "save"}
                 onClick={onSave}
               />
             </li>
@@ -234,6 +318,41 @@ export function ShareActions({ id, report }: { id: string; report: Report }) {
         </div>
       </div>
     </section>
+  );
+}
+
+/* ---- image status ------------------------------------------------------------ */
+
+function ImageStatus({ state, onRetry }: { state: ImageState; onRetry: () => void }) {
+  const chip = "inline-flex min-h-8 items-center gap-1.5 rounded-full bg-surface/85 px-3 text-micro font-semibold elev-1 backdrop-blur";
+  const spinner = <span aria-hidden className="anim-spin inline-block h-3 w-3 rounded-full border-2 border-current border-r-transparent" />;
+  return (
+    <p className="relative flex min-h-11 items-center justify-center" aria-live="polite">
+      {state === "ready" && (
+        <span className={`${chip} text-ready-ink`}>
+          <Icon name="checkCircle" size={15} weight="fill" /> HD image ready · 1080 × 1350
+        </span>
+      )}
+      {state === "loading" && (
+        <span className={`${chip} text-ink-2`}>
+          {spinner} Rendering HD image
+        </span>
+      )}
+      {state === "updating" && (
+        <span className={`${chip} text-ink-2`}>
+          {spinner} Updating with your new score
+        </span>
+      )}
+      {state === "failed" && (
+        <button
+          type="button"
+          onClick={onRetry}
+          className={`${chip} min-h-11 text-ink-2 transition-colors hover:text-brand`}
+        >
+          <Icon name="refresh" size={15} /> Image not ready · Retry
+        </button>
+      )}
+    </p>
   );
 }
 
@@ -246,16 +365,15 @@ type TileProps = {
   glyph?: React.ReactNode;
   href?: string;
   done?: boolean;
-  busy?: boolean;
   onClick?: (e: React.MouseEvent<HTMLButtonElement>) => void;
 };
 
-function Tile({ label, icon, glyph, href, done = false, busy = false, onClick }: TileProps) {
+function Tile({ label, icon, glyph, href, done = false, onClick }: TileProps) {
   const reduce = usePrefersReducedMotion();
   /* always set whileTap: motion adds tabindex for it, so dropping it after hydration would mismatch */
   const tap = { scale: reduce ? 1 : TAP_SCALE };
   const cn =
-    "group flex min-h-[4.75rem] w-full flex-col items-center justify-center gap-1.5 rounded-control border border-line bg-paper px-1.5 py-2.5 text-caption font-semibold text-ink-2 transition-colors duration-200 hover:border-brand hover:text-brand aria-disabled:pointer-events-none aria-disabled:opacity-60";
+    "share-tile group flex min-h-[4.75rem] w-full flex-col items-center justify-center gap-1.5 rounded-control bg-paper px-1.5 py-2.5 text-caption font-semibold text-ink-2 aria-disabled:pointer-events-none aria-disabled:opacity-60";
 
   const face = (
     <>
@@ -268,11 +386,7 @@ function Tile({ label, icon, glyph, href, done = false, busy = false, onClick }:
           done ? "bg-ready-soft text-ready-ink" : "bg-brand-soft text-brand"
         }`}
       >
-        {busy ? (
-          <span aria-hidden className="anim-spin inline-block h-4 w-4 rounded-full border-2 border-current border-r-transparent" />
-        ) : (
-          glyph ?? (icon && <Icon name={icon} size={20} />)
-        )}
+        {glyph ?? (icon && <Icon name={icon} size={20} />)}
       </motion.span>
       <span className="whitespace-nowrap">{label}</span>
     </>
@@ -295,42 +409,13 @@ function Tile({ label, icon, glyph, href, done = false, busy = false, onClick }:
   }
 
   return (
-    <motion.button
-      type="button"
-      onClick={onClick}
-      aria-busy={busy || undefined}
-      aria-disabled={busy || undefined}
-      className={cn}
-      whileTap={tap}
-      transition={SPRING.tap}
-    >
+    <motion.button type="button" onClick={onClick} className={cn} whileTap={tap} transition={SPRING.tap}>
       {face}
     </motion.button>
   );
 }
 
 /* ---- helpers -------------------------------------------------------------- */
-
-async function fetchCard(path: string, name: string): Promise<File | null> {
-  try {
-    const res = await fetch(path, { cache: "no-store" });
-    if (!res.ok) return null;
-    return new File([await res.blob()], name, { type: "image/png" });
-  } catch {
-    return null;
-  }
-}
-
-async function sameBytes(a: Blob, b: Blob): Promise<boolean> {
-  if (a.size !== b.size) return false;
-  const [x, y] = await Promise.all([a.arrayBuffer(), b.arrayBuffer()]);
-  const u = new Uint8Array(x);
-  const v = new Uint8Array(y);
-  for (let i = 0; i < u.length; i++) if (u[i] !== v[i]) return false;
-  return true;
-}
-
-const wait = (ms: number) => new Promise((r) => window.setTimeout(r, ms));
 
 async function copyText(value: string): Promise<boolean> {
   try {

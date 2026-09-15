@@ -23,7 +23,11 @@ import { ChartLine } from "@phosphor-icons/react/dist/ssr/ChartLine";
 import { Check } from "@phosphor-icons/react/dist/ssr/Check";
 import { CheckCircle } from "@phosphor-icons/react/dist/ssr/CheckCircle";
 import { Clock } from "@phosphor-icons/react/dist/ssr/Clock";
+import { CloudCheck } from "@phosphor-icons/react/dist/ssr/CloudCheck";
 import { Coffee } from "@phosphor-icons/react/dist/ssr/Coffee";
+import { Database } from "@phosphor-icons/react/dist/ssr/Database";
+import { DeviceMobile } from "@phosphor-icons/react/dist/ssr/DeviceMobile";
+import { GithubLogo } from "@phosphor-icons/react/dist/ssr/GithubLogo";
 import { Confetti } from "@phosphor-icons/react/dist/ssr/Confetti";
 import { Copy } from "@phosphor-icons/react/dist/ssr/Copy";
 import { Crosshair } from "@phosphor-icons/react/dist/ssr/Crosshair";
@@ -127,6 +131,10 @@ const ICONS = {
   crosshair: Crosshair,
   coffee: Coffee,
   play: Play,
+  database: Database,
+  deviceMobile: DeviceMobile,
+  cloudCheck: CloudCheck,
+  github: GithubLogo,
   home: House,
   telegram: TelegramLogo,
 } satisfies Record<string, PhosphorIcon>;

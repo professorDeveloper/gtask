@@ -12,6 +12,7 @@ import type { Report } from "@/lib/readiness/types";
 import { ScoreRing } from "./ScoreRing";
 import { GapLine } from "./GapLine";
 import { usePrefersReducedMotion } from "@/components/ui/motion";
+import { onJumpClick } from "@/components/ui/jumpTo";
 
 const HEADLINE = "Find out if your SAT plan actually";
 const ACCENT = "adds up.";
@@ -39,6 +40,7 @@ export function Hero({ sample }: { sample: Report }) {
             <Button href="/check" size="lg" icon="arrowRight">Start the check</Button>
             <a
               href="#method"
+              onClick={onJumpClick}
               className="group inline-flex min-h-11 items-center justify-center gap-1.5 rounded-full px-3 text-body font-semibold text-ink-2 transition-colors hover:text-ink"
             >
               See how it is scored

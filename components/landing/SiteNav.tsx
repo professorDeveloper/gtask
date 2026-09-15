@@ -6,6 +6,7 @@ import { LogoLink } from "@/components/ui/Logo";
 import { Button } from "@/components/ui/Button";
 import { StickyBar } from "@/components/ui/StickyBar";
 import { SPRING } from "@/components/ui/motion";
+import { JUMP_EVENT, onJumpClick } from "@/components/ui/jumpTo";
 
 const LINKS = [
   { id: "how", label: "How it works" },
@@ -35,6 +36,7 @@ export function SiteNav() {
               )}
               <a
                 href={`#${l.id}`}
+                onClick={onJumpClick}
                 aria-current={active === l.id ? "location" : undefined}
                 className={`relative inline-flex min-h-11 items-center rounded-full px-3.5 text-body font-medium transition-colors hover:text-ink ${
                   active === l.id ? "text-ink" : "text-ink-2"
@@ -72,16 +74,28 @@ export function SiteNav() {
 function useActiveSection(): string | null {
   const [active, setActive] = useState<string | null>(null);
   useEffect(() => {
+    /* a jump names its destination up front; observer updates wait until it has landed */
+    let heldUntil = 0;
+    const onJump = (e: Event) => {
+      setActive((e as CustomEvent<string>).detail);
+      heldUntil = performance.now() + 600;
+    };
+    window.addEventListener(JUMP_EVENT, onJump);
+
     const els = LINKS.map((l) => document.getElementById(l.id)).filter((el): el is HTMLElement => !!el);
     const io = new IntersectionObserver(
       (entries) => {
+        if (performance.now() < heldUntil) return;
         const hit = entries.filter((e) => e.isIntersecting).sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)[0];
         if (hit) setActive(hit.target.id);
       },
       { rootMargin: "-40% 0px -55% 0px" },
     );
     els.forEach((el) => io.observe(el));
-    return () => io.disconnect();
+    return () => {
+      io.disconnect();
+      window.removeEventListener(JUMP_EVENT, onJump);
+    };
   }, []);
   return active;
 }

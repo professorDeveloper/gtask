@@ -300,7 +300,9 @@ html.lenis, html.lenis body { height: auto; }
 
 /* ==== area: landing ==== */
 /* Pinned "five questions" story: six scroll steps (Q1–Q5 + report). */
-.story-track { height: 480svh; }
+/* Phones: ~37svh of scroll per step (the step text is short); desktop keeps a longer dwell. */
+.story-track { height: 320svh; }
+@media (min-width: 1024px) { .story-track { height: 400svh; } }
 /* The drawn phone: fits a 390×844 screen below its step text, grows on desktop. */
 .phone { width: clamp(232px, 64vw, 292px); height: clamp(430px, 58svh, 600px); }
 @media (min-width: 1024px) { .phone { width: 320px; height: clamp(520px, 66svh, 590px); } }
@@ -309,11 +311,22 @@ html.lenis, html.lenis body { height: auto; }
 .numeral svg { width: .8em; height: .8em; }
 .numeral-lg { font-size: clamp(64px, 18vw, 136px); line-height: .92; }
 .numeral-card { font-size: clamp(48px, 14vw, 64px); line-height: .9; }
-/* The shortfall stretch of the gap: striped deficit fill. */
-.gap-stripes {
-  background-color: var(--gap);
-  background-image: repeating-linear-gradient(115deg, var(--gap) 0 6px, color-mix(in oklab, var(--gap) 55%, var(--surface)) 6px 12px);
+/* The gap bar (components/viz/GapScale.tsx): one well, stacked fills.
+   today = solid brand · pace = light brand→violet · short = quiet gap tint
+   with a hairline edge · ready = a surplus past the target. Legend swatches
+   reuse the same classes, so the key always matches the drawing. */
+.gapbar-today { background: linear-gradient(90deg, color-mix(in oklab, var(--brand) 88%, var(--accent-2)), var(--brand)); }
+.gapbar-pace {
+  background: linear-gradient(90deg,
+    color-mix(in oklab, var(--brand) 38%, var(--surface)) 0%,
+    color-mix(in oklab, var(--brand) 38%, var(--surface)) 40%,
+    color-mix(in oklab, var(--accent-2) 62%, var(--surface)) 100%);
 }
+.gapbar-short {
+  background: color-mix(in oklab, var(--gap) 10%, var(--surface));
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--gap) 42%, transparent);
+}
+.gapbar-ready { background: linear-gradient(90deg, color-mix(in oklab, var(--ready) 70%, var(--surface)), var(--ready)); }
 /* White CTA on the brand mesh: a white ring, since the brand outline would vanish. */
 .cta-on-mesh:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
 /* Method lab step slider: brand fill up to the thumb, warm well after it. */
@@ -386,10 +399,6 @@ html.lenis, html.lenis body { height: auto; }
 /* ==== end area: check ==== */
 
 /* ==== area: result ==== */
-/* GapScale: the shortfall stretch, hatched so it reads as "not yet earned". */
-.gapscale-short {
-  background-image: repeating-linear-gradient(115deg, var(--gap) 0 6px, color-mix(in oklab, var(--gap) 55%, transparent) 6px 12px);
-}
 /* Warm reveal for Foundation / Building: a sunny halo behind the score dial. */
 .result-halo {
   background: radial-gradient(closest-side, color-mix(in oklab, var(--sunny) 85%, transparent) 0%,
@@ -406,14 +415,48 @@ html.lenis, html.lenis body { height: auto; }
 /* ==== end area: result ==== */
 
 /* ==== area: share ==== */
-/* placeholder sweep while the share card image renders */
-.share-shimmer { overflow: hidden; }
+/* The stage behind the card preview: brand wash plus the answer-sheet dots. */
+.share-stage {
+  background-color: var(--paper);
+  background-image:
+    radial-gradient(70% 60% at 20% 15%, color-mix(in oklab, var(--brand) 20%, transparent) 0%, transparent 70%),
+    radial-gradient(60% 55% at 90% 20%, color-mix(in oklab, var(--accent-2) 18%, transparent) 0%, transparent 70%),
+    radial-gradient(60% 50% at 75% 95%, color-mix(in oklab, var(--sunny) 26%, transparent) 0%, transparent 70%);
+}
+.share-stage::before {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background-image: radial-gradient(circle at center, color-mix(in oklab, var(--ink) 14%, transparent) 1.2px, transparent 1.4px);
+  background-size: 18px 18px;
+  mask-image: radial-gradient(60% 60% at 50% 45%, #000 20%, transparent 100%);
+}
+/* The preview frame is a size container: 1 card pixel = --card-u. */
+.share-frame { container-type: inline-size; --card-u: calc(100cqw / 1080); }
+.share-card-tilt { transition: transform .5s var(--ease-spring-css); }
+@media (hover: hover) and (pointer: fine) {
+  .share-stage:hover .share-card-tilt { transform: rotate(0deg) translateY(-4px) scale(1.02); }
+}
+/* the rendered PNG fades in over its HTML twin */
+.share-png { opacity: 0; transition: opacity .5s var(--ease-out-soft); }
+.share-png[data-shown="true"] { opacity: 1; }
+/* sweep while a refined card is being redrawn */
+.share-shimmer { overflow: hidden; pointer-events: none; }
 .share-shimmer::after {
   content: ""; position: absolute; inset: 0;
   transform: translateX(-140%);
-  background: linear-gradient(100deg, transparent 20%, rgb(255 255 255 / 0.28) 50%, transparent 80%);
+  background: linear-gradient(100deg, transparent 20%, rgb(255 255 255 / 0.30) 50%, transparent 80%);
   animation: shimmer 1.4s var(--ease-out-soft) infinite;
 }
-@media (prefers-reduced-motion: reduce) { .share-shimmer::after { display: none; } }
+.share-tile {
+  border: 1px solid var(--line);
+  transition: border-color .2s ease, background-color .2s ease, box-shadow .24s var(--ease-out-soft), color .2s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+@media (hover: hover) and (pointer: fine) {
+  .share-tile:hover { border-color: color-mix(in oklab, var(--brand) 45%, var(--line)); box-shadow: var(--elev-2); color: var(--brand); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .share-shimmer::after { display: none; }
+  .share-stage:hover .share-card-tilt { transform: none; }
+}
 
 /* ==== end area: share ==== */

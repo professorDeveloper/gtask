@@ -3,7 +3,7 @@
 import { AnimatePresence, motion } from "motion/react";
 import { Icon } from "@/components/ui/Icon";
 import { LogoMark } from "@/components/ui/Logo";
-import { SPRING } from "@/components/ui/motion";
+import { SPRING, usePrefersReducedMotion } from "@/components/ui/motion";
 import { QUESTIONS } from "@/lib/readiness/questions";
 import type { Answers, Report } from "@/lib/readiness/types";
 
@@ -95,6 +95,8 @@ function Rail({ step }: { step: number }) {
 
 function QuestionScreen({ index, picked }: { index: number; picked: string }) {
   const q = QUESTIONS[index];
+  /* the tap ripple is pure decoration; a frozen one reads as a smudge */
+  const reduce = usePrefersReducedMotion();
   /* five options must still clear the pinned Next button on a small phone */
   const dense = q.options.length > 4;
   return (
@@ -132,7 +134,7 @@ function QuestionScreen({ index, picked }: { index: number; picked: string }) {
                   <Icon name="checkCircle" size={18} weight="fill" />
                 </motion.span>
               )}
-              {isPick && (
+              {isPick && !reduce && (
                 <motion.span
                   className="pointer-events-none absolute top-1/2 right-10 h-8 w-8 -translate-y-1/2 rounded-full bg-sunny/70"
                   initial={{ scale: 0.2, opacity: 0.9 }}
@@ -152,7 +154,7 @@ function ReportScreen({ sample }: { sample: Report }) {
   const rows = [
     { icon: "calendarDots", label: "Mon–Sun study plan" },
     { icon: "timer", label: "Session & focus stats" },
-    { icon: "sparkle", label: "Refine: +30% accuracy" },
+    { icon: "sparkle", label: "3 optional questions" },
   ] as const;
   return (
     <div>

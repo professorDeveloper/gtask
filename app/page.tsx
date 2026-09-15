@@ -5,6 +5,7 @@ import { GapStory } from "@/components/landing/GapStory";
 import { MethodLab } from "@/components/landing/MethodLab";
 import { BandLadder } from "@/components/landing/BandLadder";
 import { SharePreview } from "@/components/landing/SharePreview";
+import { BuiltToBrief } from "@/components/landing/BuiltToBrief";
 import { Faq } from "@/components/landing/Faq";
 import { FinalCta } from "@/components/landing/FinalCta";
 import { SiteFooter } from "@/components/landing/SiteFooter";
@@ -89,10 +90,11 @@ export default async function HomePage() {
           perQuestionMs={SAMPLE_SESSION.perQuestionMs}
           countdown={countdown}
         />
+        <BuiltToBrief checks={checks} ruleWeights={RULES.map((r) => r.weight)} />
         <Faq />
         <FinalCta />
       </main>
-      <SiteFooter checks={checks} />
+      <SiteFooter />
     </>
   );
 }
