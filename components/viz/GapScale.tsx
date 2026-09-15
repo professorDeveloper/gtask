@@ -1,100 +1,147 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useRef } from "react";
+import { motion, useInView } from "motion/react";
+import { usePrefersReducedMotion } from "@/components/ui/motion";
 
 const MIN = 400;
 const MAX = 1600;
 const pct = (score: number) => ((Math.min(MAX, Math.max(MIN, score)) - MIN) / (MAX - MIN)) * 100;
+/** A segment that exists is never shorter than this, so it peeks past the 24px today marker. */
+const PEEK_PX = 18;
+
+const EASE = [0.22, 1, 0.36, 1] as const;
 
 /**
  * The product's signature chart: one SAT scale, three marks.
- * What you have today, where your current pace lands you, and what the
- * target asks for. The coloured stretch between the last two is the gap.
+ * Today, where the current pace lands, and the target. Between pace and
+ * target is the shortfall; when today already clears the target, the stretch
+ * past it is drawn as a green surplus instead. Draws once when scrolled into view.
  */
 export function GapScale({
-  baseline, projected, target, compact = false, assumed = false,
+  baseline, projected, target, assumed = false,
 }: {
   baseline: number;
   projected: number;
   target: number;
-  compact?: boolean;
   assumed?: boolean;
 }) {
-  const [on, setOn] = useState(false);
-  useEffect(() => {
-    const id = requestAnimationFrame(() => setOn(true));
-    return () => cancelAnimationFrame(id);
-  }, []);
+  const ref = useRef<HTMLDivElement>(null);
+  const reduce = usePrefersReducedMotion();
+  const inView = useInView(ref, { once: true, margin: "0px 0px -20% 0px" });
+  const on = reduce || inView;
 
+  const surplus = baseline >= target;
+  const pace = surplus ? baseline : Math.max(projected, baseline);
   const b = pct(baseline);
-  const p = pct(projected);
   const t = pct(target);
-  const ease = "transition-[width,left,opacity] duration-1000 ease-[cubic-bezier(.22,1,.36,1)]";
+  /* Segments that exist get a minimum width in px, so a small pace step or surplus
+     still peeks out from under the 24px today marker without shifting the scale. */
+  const paceReal = surplus ? 0 : Math.max(0, pct(pace) - b);
+  const paceW = paceReal > 0 ? `max(${paceReal}%, ${PEEK_PX}px)` : "0px";
+  const paceEnd = `calc(${b}% + ${paceW})`;
+  const shortW = surplus || t <= pct(pace) ? null : `max(0px, calc(${t}% - ${paceEnd}))`;
+  const surplusW = surplus && b > t ? `max(${b - t}%, ${PEEK_PX}px)` : null;
+  const markerAt = surplus ? (surplusW ? `calc(${t}% + ${surplusW})` : `${t}%`) : `${b}%`;
+
+  const grow = (delay: number) => ({
+    initial: { scaleX: 0 },
+    animate: on ? { scaleX: 1 } : undefined,
+    transition: reduce ? { duration: 0 } : { duration: 0.9, delay, ease: EASE },
+  });
+
+  const summary = surplus
+    ? `Today ${baseline}${assumed ? " (estimated)" : ""}, already ${baseline - target} above the target of ${target}.`
+    : `Today ${baseline}${assumed ? " (estimated)" : ""}. On this pace ${pace}. Target ${target}${
+        target > pace ? `, ${target - pace} short` : ""
+      }.`;
 
   return (
-    <div className={compact ? "" : "select-none"}>
-      <div className={`relative ${compact ? "h-9" : "h-12"}`}>
+    <div ref={ref} className="select-none">
+      <div className="relative h-[76px]" role="img" aria-label={summary}>
+        {/* target flag, labelled above the track */}
+        <motion.div
+          className="absolute top-0 flex -translate-x-1/2 flex-col items-center"
+          style={{ left: `${t}%` }}
+          initial={{ opacity: 0, y: -6 }}
+          animate={on ? { opacity: 1, y: 0 } : undefined}
+          transition={{ duration: 0.5, delay: 0.9, ease: EASE }}
+        >
+          <span className="tnum rounded-full bg-ink px-2 py-0.5 font-mono text-micro font-semibold whitespace-nowrap text-surface">
+            {target}
+          </span>
+          <span className="h-[34px] w-0.5 rounded-full bg-ink" />
+        </motion.div>
+
         {/* track */}
-        <div className={`absolute inset-x-0 ${compact ? "top-3 h-3" : "top-4 h-4"} well rounded-full`} />
-        {/* what the student already has */}
-        <div
-          className={`absolute ${compact ? "top-3 h-3" : "top-4 h-4"} left-0 rounded-l-full bg-brand/25 ${ease}`}
-          style={{ width: `${on ? b : 0}%` }}
-        />
-        {/* what the current pace adds */}
-        <div
-          className={`absolute ${compact ? "top-3 h-3" : "top-4 h-4"} bg-progress ${ease}`}
-          style={{ left: `${b}%`, width: `${on ? Math.max(0, p - b) : 0}%` }}
-        />
-        {/* the shortfall */}
-        <div
-          className={`absolute ${compact ? "top-3 h-3" : "top-4 h-4"} rounded-r-full ${ease}`}
-          style={{
-            left: `${p}%`,
-            width: `${on ? Math.max(0, t - p) : 0}%`,
-            backgroundImage:
-              "repeating-linear-gradient(115deg, var(--gap) 0 6px, color-mix(in oklab, var(--gap) 55%, transparent) 6px 12px)",
-          }}
-        />
-        {/* target flag */}
-        <div
-          className={`absolute ${compact ? "top-0.5" : "top-1"} -translate-x-1/2 ${ease}`}
-          style={{ left: `${t}%`, opacity: on ? 1 : 0 }}
-        >
-          <div className={`mx-auto w-0.5 rounded-full bg-ink ${compact ? "h-8" : "h-10"}`} />
-        </div>
-        {/* today marker */}
-        <div
-          className={`absolute ${compact ? "top-2" : "top-3"} -translate-x-1/2 ${ease}`}
-          style={{ left: `${b}%`, opacity: on ? 1 : 0 }}
-        >
-          <div
-            className={`rounded-full border-[3px] border-brand bg-surface ${compact ? "h-5 w-5" : "h-6 w-6"}`}
+        <div className="well absolute inset-x-0 top-[38px] h-4 overflow-hidden rounded-full">
+          <motion.div
+            className="absolute inset-y-0 left-0 origin-left bg-brand/25"
+            style={{ width: `${b}%` }}
+            {...grow(0)}
           />
+          {paceReal > 0 && (
+            <motion.div
+              className="absolute inset-y-0 origin-left bg-progress"
+              style={{ left: `${b}%`, width: paceW }}
+              {...grow(0.45)}
+            />
+          )}
+          {shortW && (
+            <motion.div
+              className="gapscale-short absolute inset-y-0 origin-left"
+              style={{ left: paceEnd, width: shortW }}
+              {...grow(0.8)}
+            />
+          )}
+          {surplusW && (
+            <motion.div
+              className="absolute inset-y-0 origin-left bg-ready"
+              style={{ left: `${t}%`, width: surplusW }}
+              {...grow(0.7)}
+            />
+          )}
         </div>
+
+        {/* today marker */}
+        <motion.div
+          className="absolute top-[34px] -translate-x-1/2"
+          style={{ left: markerAt }}
+          initial={{ scale: 0 }}
+          animate={on ? { scale: 1 } : undefined}
+          transition={{ type: "spring", stiffness: 420, damping: 18, delay: 0.3 }}
+        >
+          <div className={`h-6 w-6 rounded-full border-[3px] bg-surface elev-1 ${surplus ? "border-ready" : "border-brand"}`} />
+        </motion.div>
       </div>
 
-      <div className="mt-1 flex justify-between font-mono text-[10px] tracking-[0.08em] text-ink-3">
+      <div className="flex justify-between font-mono text-micro text-ink-3" aria-hidden>
         <span>400</span><span>1000</span><span>1600</span>
       </div>
 
-      <dl className={`mt-4 grid grid-cols-3 gap-2 ${compact ? "text-[11px]" : "text-[12px]"}`}>
-        <Legend swatch="bg-brand/45" label={assumed ? "Today (est.)" : "Today"} value={baseline} />
-        <Legend swatch="bg-progress" label="On this pace" value={projected} />
+      <dl className="mt-5 grid grid-cols-3 gap-3">
+        <Legend swatch="bg-brand/25 ring-2 ring-brand ring-inset" label={assumed ? "Today (est.)" : "Today"} value={baseline} />
+        {surplus ? (
+          <Legend swatch="bg-ready" label="Above target" value={`+${baseline - target}`} tone="text-ready-ink" />
+        ) : (
+          <Legend swatch="bg-progress" label="On this pace" value={pace} />
+        )}
         <Legend swatch="bg-ink" label="Target" value={target} />
       </dl>
     </div>
   );
 }
 
-function Legend({ swatch, label, value }: { swatch: string; label: string; value: number }) {
+function Legend({
+  swatch, label, value, tone = "text-ink",
+}: { swatch: string; label: string; value: number | string; tone?: string }) {
   return (
-    <div>
-      <dt className="flex items-center gap-1.5 text-ink-3">
-        <span className={`h-2 w-2 shrink-0 rounded-full ${swatch}`} />
+    <div className="min-w-0">
+      <dt className="flex items-center gap-1.5 text-caption text-ink-3">
+        <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${swatch}`} />
         <span className="truncate">{label}</span>
       </dt>
-      <dd className="tnum mt-0.5 font-display text-[19px] font-bold tracking-[-0.03em]">{value}</dd>
+      <dd className={`tnum mt-1 font-display text-title font-bold tracking-[-0.03em] ${tone}`}>{value}</dd>
     </div>
   );
 }

@@ -1,76 +1,96 @@
 import { SiteNav } from "@/components/landing/SiteNav";
 import { Hero } from "@/components/landing/Hero";
-import { HowItWorks } from "@/components/landing/HowItWorks";
-import { WhatYouGet } from "@/components/landing/WhatYouGet";
+import { StoryFiveQuestions } from "@/components/landing/StoryFiveQuestions";
+import { GapStory } from "@/components/landing/GapStory";
 import { MethodLab } from "@/components/landing/MethodLab";
 import { BandLadder } from "@/components/landing/BandLadder";
+import { SharePreview } from "@/components/landing/SharePreview";
 import { Faq } from "@/components/landing/Faq";
+import { FinalCta } from "@/components/landing/FinalCta";
 import { SiteFooter } from "@/components/landing/SiteFooter";
-import { SectionHead } from "@/components/ui/Surface";
-import { Button } from "@/components/ui/Button";
-import { Reveal } from "@/components/ui/Reveal";
-import { evaluate } from "@/lib/readiness/engine";
+import { SmoothScroll } from "@/components/ui/SmoothScroll";
+import { Badge, SectionHead } from "@/components/ui/Surface";
+import { evaluate, FOCUS_ADJUSTMENT, NEUTRAL_MODIFIERS } from "@/lib/readiness/engine";
+import { weeklyPlan } from "@/lib/readiness/calendar";
+import { summarizeSession, type SessionStats } from "@/lib/readiness/session";
+import { daysToTest } from "@/lib/readiness/countdown";
+import { TIMELINE } from "@/lib/readiness/questions";
 import { countSubmissions } from "@/lib/store";
 import type { Answers } from "@/lib/readiness/types";
 
-/** A fixed answer set, run through the real engine, so the hero shows real output. */
+/** A fixed answer set, run through the real engine, so every sample on the page is real output. */
 const SAMPLE: Answers = ["t_2m", "b_mid", "h_high", "f_math", "g_1400"];
+
+/** A plausible, focused one-sitting run for the session-stats preview. */
+const SAMPLE_SESSION: SessionStats = {
+  totalMs: 74_000,
+  perQuestionMs: [9_000, 14_000, 11_000, 25_000, 15_000],
+  tabLeaves: 0,
+  awayMs: 0,
+  answerChanges: 1,
+};
+
+const RULES = [
+  { name: "Proximity", weight: 40, body: "How close your baseline already sits to the target." },
+  { name: "Capacity", weight: 38, body: "Hours left before test day against the hours your gap costs." },
+  { name: "Habit", weight: 22, body: "Your weekly rhythm, counted up to 10 hours." },
+];
 
 export const revalidate = 120;
 
 export default async function HomePage() {
   const sample = evaluate(SAMPLE);
+  const plan = weeklyPlan(sample);
+  const countdown = daysToTest(TIMELINE[SAMPLE[0] as keyof typeof TIMELINE]).label;
   const checks = await countSubmissions().catch(() => 0);
 
   return (
     <>
+      <SmoothScroll />
       <SiteNav />
-      <main>
+      <main className="overflow-x-clip">
         <Hero sample={sample} />
-        <HowItWorks />
-        <WhatYouGet sample={sample} />
+        <StoryFiveQuestions answers={SAMPLE} sample={sample} />
+        <GapStory sample={sample} />
 
-        <section id="method" className="border-y border-line bg-surface">
-          <div className="mx-auto max-w-6xl px-5 py-20 md:py-28">
-            <SectionHead
-              eyebrow="The method"
-              title="Move an input. Watch the score move."
-              lede="This is the scoring engine itself, running in your browser. Three weighted rules, one calibration constant, no model in the loop."
-            />
-            <Reveal className="mt-12">
-              <MethodLab />
-            </Reveal>
-            <p className="mt-6 max-w-2xl text-[14.5px] leading-relaxed text-ink-2">
-              Proximity is how close your baseline already sits to your target. Capacity compares the
-              study hours your gap costs with the hours left before test day. Habit is your weekly
-              rhythm. A pacing-only weakness adds 3; a weakness in both sections subtracts 5; an
-              unmeasured baseline discounts the whole score by 10%.
-            </p>
+        <section id="method" className="mx-auto max-w-6xl scroll-mt-16 px-5 py-16 md:py-24">
+          <SectionHead
+            eyebrow="The method"
+            title="Move an input. Watch the score move."
+            lede="This is the scoring engine itself, running in your browser. Three weighted rules, one calibration constant, no model in the loop."
+          />
+          <div className="mt-10">
+            <MethodLab />
+          </div>
+          <ul className="mt-6 grid gap-3 sm:grid-cols-3">
+            {RULES.map((r) => (
+              <li key={r.name} className="rounded-card border border-line bg-surface p-4 elev-1">
+                <p className="flex items-baseline justify-between gap-3">
+                  <span className="font-display text-title font-bold">{r.name}</span>
+                  <span className="tnum font-mono text-caption text-ink-2">up to {r.weight}</span>
+                </p>
+                <p className="mt-1 text-caption text-ink-2">{r.body}</p>
+              </li>
+            ))}
+          </ul>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <span className="w-full text-caption text-ink-2 sm:w-auto">Adjustments</span>
+            <Badge tone="brand">Pacing only +{FOCUS_ADJUSTMENT.pace}</Badge>
+            <Badge tone="gap">Weak in both sections −{Math.abs(FOCUS_ADJUSTMENT.both)}</Badge>
+            <Badge tone="progress">No practice test yet ×{NEUTRAL_MODIFIERS.unmeasuredDiscount}</Badge>
           </div>
         </section>
 
         <BandLadder />
+        <SharePreview
+          sample={sample}
+          plan={plan}
+          session={summarizeSession(SAMPLE_SESSION)}
+          perQuestionMs={SAMPLE_SESSION.perQuestionMs}
+          countdown={countdown}
+        />
         <Faq />
-
-        <section className="mx-auto max-w-6xl px-5 pb-24">
-          <Reveal>
-            <div className="sheet-texture elev-2 relative overflow-hidden rounded-[26px] border border-line px-6 py-14 text-center md:py-20">
-              <div className="absolute inset-0 bg-surface/85" aria-hidden />
-              <div className="relative">
-                <h2 className="mx-auto max-w-[18ch] text-[clamp(30px,6.4vw,48px)] leading-[1.02] font-bold text-balance">
-                  Five questions is a cheap way to find out.
-                </h2>
-                <p className="mx-auto mt-5 max-w-[46ch] text-[16.5px] leading-relaxed text-ink-2">
-                  Most SAT plans fail on arithmetic, not ambition. Check yours before the calendar
-                  checks it for you.
-                </p>
-                <div className="mt-9 flex justify-center">
-                  <Button href="/check" size="lg" icon="arrowRight">Start the check</Button>
-                </div>
-              </div>
-            </div>
-          </Reveal>
-        </section>
+        <FinalCta />
       </main>
       <SiteFooter checks={checks} />
     </>

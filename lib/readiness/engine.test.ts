@@ -19,6 +19,25 @@ describe("evaluate", () => {
     expect(r.shortfall).toBe(0);
   });
 
+  it("never projects below today's score, even above the target", () => {
+    const r = evaluate(answers("t_2m", "b_top", "h_mid", "f_math", "g_1400"));
+    expect(r.baseline).toBeGreaterThan(r.target);
+    expect(r.projected).toBe(r.baseline);
+    expect(r.shortfall).toBe(0);
+    for (const t of QUESTIONS[0].options)
+      for (const b of QUESTIONS[1].options)
+        for (const g of QUESTIONS[4].options) {
+          const x = evaluate(answers(t.id, b.id, "h_low", "f_rw", g.id));
+          expect(x.projected).toBeGreaterThanOrEqual(x.baseline);
+        }
+  });
+
+  it("does not tell a student far short of target that the plan works", () => {
+    const r = evaluate(answers("t_2m", "b_mid", "h_mid", "f_math", "g_1300"));
+    expect(r.shortfall).toBeGreaterThan(50);
+    expect(r.verdict).not.toMatch(/it works/i);
+  });
+
   it("scores a large gap with no time and no hours at the bottom", () => {
     const r = evaluate(answers("t_4w", "b_low", "h_low", "f_both", "g_1500"));
     expect(r.gap).toBe(560);

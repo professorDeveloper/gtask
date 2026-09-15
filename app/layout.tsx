@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Gabarito, Manrope, JetBrains_Mono } from "next/font/google";
+import { Providers } from "@/components/ui/Providers";
 import "./globals.css";
 
 const gabarito = Gabarito({ subsets: ["latin"], variable: "--font-gabarito", display: "swap" });
@@ -18,30 +19,27 @@ export const metadata: Metadata = {
     title: "GTask — SAT Readiness Check",
     description: "Five questions. One honest read of your SAT gap, scored by rules you can inspect.",
     type: "website",
+    siteName: "GTask",
   },
+  twitter: { card: "summary_large_image" },
 };
 
 export const viewport: Viewport = {
-  themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#F4F7FB" },
-    { media: "(prefers-color-scheme: dark)", color: "#060A12" },
-  ],
+  themeColor: "#FAFAF7",
+  colorScheme: "light",
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
 };
 
-/* Runs before paint so a dark-theme visitor never sees a white flash. */
-const themeScript = `(()=>{try{const s=localStorage.getItem("gtask-theme");const d=window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.dataset.theme=s||(d?"dark":"light");}catch(e){document.documentElement.dataset.theme="light";}})()`;
-
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <head>
-        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
-      </head>
-      <body className={`${gabarito.variable} ${manrope.variable} ${mono.variable} antialiased`}>
-        {children}
+    <html lang="en" className={`${gabarito.variable} ${manrope.variable} ${mono.variable}`}>
+      <body>
+        <noscript>
+          <style>{`[data-reveal]{opacity:1!important;transform:none!important}`}</style>
+        </noscript>
+        <Providers>{children}</Providers>
       </body>
     </html>
   );

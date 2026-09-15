@@ -1,112 +1,172 @@
+"use client";
+
+import { useRef } from "react";
+import { motion, useInView, useScroll, useSpring, useTransform } from "motion/react";
 import { Button } from "@/components/ui/Button";
-import { Badge, Card } from "@/components/ui/Surface";
+import { Badge, Card, Eyebrow } from "@/components/ui/Surface";
 import { Icon } from "@/components/ui/Icon";
-import { GapScale } from "@/components/viz/GapScale";
-import { ScoreDial } from "@/components/viz/ScoreDial";
+import { Sticker } from "@/components/ui/Sticker";
+import { CountUp } from "@/components/ui/CountUp";
+import { SPRING } from "@/components/ui/motion";
 import type { Report } from "@/lib/readiness/types";
+import { ScoreRing } from "./ScoreRing";
+import { GapLine } from "./GapLine";
+import { usePrefersReducedMotion } from "@/components/ui/motion";
+
+const HEADLINE = "Find out if your SAT plan actually";
+const ACCENT = "adds up.";
 
 export function Hero({ sample }: { sample: Report }) {
   return (
-    <section className="relative overflow-hidden">
-      <div className="grid-texture fade-edges pointer-events-none absolute inset-0 opacity-45" aria-hidden />
-      <div
-        className="pointer-events-none absolute -top-40 left-1/2 h-[520px] w-[820px] -translate-x-1/2 rounded-full opacity-[0.16] blur-[90px]"
-        style={{ background: "radial-gradient(circle, var(--brand), transparent 65%)" }}
-        aria-hidden
-      />
-      <div className="relative mx-auto grid max-w-6xl gap-12 px-5 pt-14 pb-12 md:pt-20 lg:grid-cols-[1.05fr_0.95fr] lg:items-center lg:gap-16 lg:pt-24 lg:pb-24">
+    <section className="mesh grain">
+      <div className="mx-auto grid max-w-6xl gap-10 px-5 pt-8 pb-16 md:pt-16 lg:grid-cols-[1.08fr_0.92fr] lg:items-center lg:gap-14 lg:pt-20 lg:pb-28">
         <div>
-          <div className="anim-rise elev-1 inline-flex items-center gap-2 rounded-full border border-line bg-surface py-1.5 pr-4 pl-1.5 text-[13px] font-medium">
-            <span className="rounded-full bg-brand px-2.5 py-1 text-[11px] font-bold tracking-wide text-brand-ink uppercase">
-              Free
-            </span>
-            <span className="text-ink-2">5 questions · 60 seconds · no sign-up</span>
-          </div>
-
-          <h1 className="anim-rise mt-7 text-[clamp(40px,9vw,68px)] leading-[0.98] font-bold text-balance" style={{ ["--i" as string]: 1 }}>
-            Find out if your SAT plan actually adds up.
-          </h1>
-
-          <p className="anim-rise mt-6 max-w-[54ch] text-[17px] leading-relaxed text-ink-2" style={{ ["--i" as string]: 2 }}>
-            Tell GTask your test date, your last practice score and the hours you really study.
-            It works out what your points gap costs in study hours — and whether your current pace
-            closes it before test day.
+          <p className="anim-rise inline-flex min-h-9 items-center gap-2 rounded-full border border-line bg-surface/80 py-1 pr-3.5 pl-1 text-caption font-medium text-ink-2 elev-1">
+            <span className="rounded-full bg-brand px-2.5 py-0.5 text-micro font-bold text-brand-ink">Free</span>
+            5 questions · 60 seconds · no sign-up
           </p>
 
-          <div className="anim-rise mt-9 flex flex-col items-start gap-4 sm:flex-row sm:items-center sm:gap-5" style={{ ["--i" as string]: 3 }}>
-            <Button href="/check" size="lg" icon="arrowRight" className="w-full sm:w-auto">
-              Start the check
-            </Button>
+          <Headline />
+
+          <p className="anim-rise mt-5 max-w-[44ch] text-lede text-ink-2" style={{ ["--i" as string]: 5 }}>
+            Five questions. We turn your points gap into study hours and tell you if your pace closes it.
+          </p>
+
+          <div
+            className="anim-rise mt-7 flex flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:gap-4"
+            style={{ ["--i" as string]: 6 }}
+          >
+            <Button href="/check" size="lg" icon="arrowRight">Start the check</Button>
             <a
               href="#method"
-              className="group inline-flex items-center gap-2 px-1 py-2 text-[15px] font-semibold text-ink-2 transition-colors hover:text-ink"
+              className="group inline-flex min-h-11 items-center justify-center gap-1.5 rounded-full px-3 text-body font-semibold text-ink-2 transition-colors hover:text-ink"
             >
               See how it is scored
               <Icon name="chevron" size={17} className="transition-transform duration-200 group-hover:translate-y-0.5" />
             </a>
           </div>
 
-          <ul className="anim-rise mt-9 flex flex-wrap items-center gap-x-6 gap-y-3 text-[13.5px] text-ink-3" style={{ ["--i" as string]: 4 }}>
-            <li className="flex items-center gap-2"><Icon name="shield" size={17} className="text-ink-3" /> No account, no email</li>
-            <li className="flex items-center gap-2"><Icon name="layers" size={17} className="text-ink-3" /> Three rules, all shown</li>
-            <li className="flex items-center gap-2"><Icon name="gauge" size={17} className="text-ink-3" /> Same answers, same score</li>
+          <ul
+            className="anim-rise mt-8 hidden flex-wrap gap-x-5 gap-y-2 text-caption text-ink-3 sm:flex"
+            style={{ ["--i" as string]: 7 }}
+          >
+            <li className="flex items-center gap-1.5"><Icon name="shield" size={16} /> No account, no email</li>
+            <li className="flex items-center gap-1.5"><Icon name="layers" size={16} /> Three rules, all shown</li>
+            <li className="flex items-center gap-1.5"><Icon name="gauge" size={16} /> Same answers, same score</li>
           </ul>
         </div>
 
-        <div className="anim-rise relative lg:pl-4" style={{ ["--i" as string]: 3 }}>
-          <Card elevation={3} className="relative z-10 overflow-hidden p-5 sm:p-7 lg:p-8">
-            <div className="flex items-center justify-between">
-              <p className="font-mono text-[11px] tracking-[0.14em] text-ink-3 uppercase">Sample report</p>
+        <SampleCard sample={sample} />
+      </div>
+    </section>
+  );
+}
+
+/** The headline rises word by word; screen readers get the sentence once. */
+function Headline() {
+  const reduce = usePrefersReducedMotion();
+  const words = [...HEADLINE.split(" ").map((w) => ({ w, accent: false })), ...ACCENT.split(" ").map((w) => ({ w, accent: true }))];
+  return (
+    <h1 className="mt-6 max-w-[14ch] text-display font-bold">
+      <span className="sr-only-text">{`${HEADLINE} ${ACCENT}`}</span>
+      <span aria-hidden>
+        {words.map(({ w, accent }, i) => (
+          <span key={i}>
+            <motion.span
+              data-reveal
+              className={`inline-block ${accent ? "text-mesh pr-[0.04em]" : ""}`}
+              initial={reduce ? false : { opacity: 0, y: "0.45em", filter: "blur(6px)" }}
+              animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+              transition={{ ...SPRING.gentle, delay: 0.08 + i * 0.06 }}
+            >
+              {w}
+            </motion.span>{" "}
+          </span>
+        ))}
+      </span>
+    </h1>
+  );
+}
+
+function SampleCard({ sample }: { sample: Report }) {
+  const reduce = usePrefersReducedMotion();
+  const ref = useRef<HTMLDivElement>(null);
+  const inView = useInView(ref, { once: true, amount: 0.4 });
+  const { scrollY } = useScroll();
+  const parallax = useTransform(scrollY, [0, 600], [0, -44]);
+  const rotateX = useSpring(0, { stiffness: 170, damping: 18 });
+  const rotateY = useSpring(0, { stiffness: 170, damping: 18 });
+
+  const onMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (reduce || e.pointerType !== "mouse") return;
+    const r = e.currentTarget.getBoundingClientRect();
+    rotateY.set(((e.clientX - r.left) / r.width - 0.5) * 12);
+    rotateX.set(-((e.clientY - r.top) / r.height - 0.5) * 12);
+  };
+  const reset = () => { rotateX.set(0); rotateY.set(0); };
+
+  const tiles = [
+    { v: sample.requiredHours, suffix: " h", l: "to close the gap" },
+    { v: sample.weeklyNeed, suffix: " h", l: "needed / week" },
+    { v: sample.shortfall, suffix: "", l: "pts short" },
+  ];
+
+  return (
+    <motion.div ref={ref} style={reduce ? undefined : { y: parallax }} className="relative [perspective:1200px] lg:pl-2">
+      <motion.div
+        initial={reduce ? false : { opacity: 0, y: 32, scale: 0.97 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={{ ...SPRING.gentle, delay: 0.45 }}
+      >
+        <motion.div
+          onPointerMove={onMove}
+          onPointerLeave={reset}
+          style={{ rotateX, rotateY, transformStyle: "preserve-3d" }}
+          className="relative"
+        >
+          <Card elevation={3} className="relative p-5 sm:p-7">
+            <div className="flex items-center justify-between gap-3">
+              <Eyebrow>Sample report</Eyebrow>
               <Badge tone={sample.band.tone}>{sample.band.name}</Badge>
             </div>
 
-            <div className="mt-4 flex items-center gap-5">
-              <ScoreDial score={sample.readiness} band={sample.band} size={140} />
+            <div className="mt-4 flex items-center gap-4 sm:gap-6">
+              <ScoreRing score={sample.readiness} band={sample.band} size={120} />
               <div className="min-w-0">
-                <p className="font-display text-[24px] leading-tight font-bold tracking-[-0.035em]">
+                <p className="font-display text-title font-bold tracking-[-0.03em]">
                   {sample.archetype}
                 </p>
-                <p className="mt-1.5 text-[13.5px] leading-snug text-ink-2">
+                <p className="mt-1.5 text-caption text-ink-2">
                   {sample.gap} points to climb, {sample.weeks} weeks left.
                 </p>
               </div>
             </div>
 
-            <div className="mt-6 border-t border-line pt-5">
-              <GapScale
-                baseline={sample.baseline}
-                projected={sample.projected}
-                target={sample.target}
-                compact
-              />
-            </div>
+            <GapLine
+              className="mt-6 border-t border-line pt-5"
+              baseline={sample.baseline}
+              projected={sample.projected}
+              target={sample.target}
+              drawn={inView || reduce}
+            />
 
-            <div className="mt-5 grid grid-cols-3 gap-2">
-              {[
-                { v: `${sample.requiredHours} h`, l: "gap costs" },
-                { v: `${sample.weeklyNeed} h`, l: "per week" },
-                { v: `${sample.shortfall}`, l: "points short" },
-              ].map((s) => (
-                <div key={s.l} className="well rounded-xl px-3 py-3">
-                  <p className="tnum font-display text-[20px] font-bold tracking-[-0.03em]">{s.v}</p>
-                  <p className="text-[11.5px] text-ink-3">{s.l}</p>
+            <dl className="mt-5 grid grid-cols-3 gap-2">
+              {tiles.map((t) => (
+                <div key={t.l} className="well flex flex-col-reverse rounded-control px-3 py-2.5">
+                  <dt className="text-micro text-ink-3">{t.l}</dt>
+                  <dd className="font-display text-title font-bold tracking-[-0.03em]">
+                    <CountUp value={t.v} startOnView format={(n) => `${Math.round(n)}${t.suffix}`} />
+                  </dd>
                 </div>
               ))}
-            </div>
+            </dl>
           </Card>
 
-          <div className="elev-4 absolute -bottom-5 -left-1 z-20 hidden items-center gap-2 rounded-2xl border border-line px-4 py-3 sm:flex lg:-left-6">
-            <span className="grid h-8 w-8 place-items-center rounded-full bg-ready-soft text-ready">
-              <Icon name="check" size={16} strokeWidth={2.2} />
-            </span>
-            <span className="text-[13px] leading-tight">
-              <b className="font-semibold">Rules, not guesses.</b>
-              <br />
-              <span className="text-ink-3">Every number is shown on the report.</span>
-            </span>
+          <div className="absolute -top-4 right-4 z-10" style={{ transform: "translateZ(40px)" }}>
+            <Sticker tone="sunny" icon="share" rotate={5} delay={1.1}>Share card inside</Sticker>
           </div>
-        </div>
-      </div>
-    </section>
+        </motion.div>
+      </motion.div>
+    </motion.div>
   );
 }

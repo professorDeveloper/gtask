@@ -72,9 +72,53 @@ export type Report = {
   requiredHours: number;
   weeklyNeed: number;
 
-  focus: { rw: number; math: number; label: string };
+  /** Study split; `section` is the Q4 answer the split was derived from. */
+  focus: { rw: number; math: number; label: string; section: FocusSection };
   components: ScoreComponent[];
   phases: Phase[];
   moves: Move[];
   flags: { unbooked: boolean; needsDiagnostic: boolean; pacingIssue: boolean };
+  /** Present only on a report produced by `refine()` with at least one optional answer. */
+  refined?: RefinedInfo;
+};
+
+export type FocusSection = "rw" | "math" | "both" | "pace";
+
+/* ---- optional refinement (result page) -------------------------------- */
+
+export type PracticeId = "p_0" | "p_1_2" | "p_3_5" | "p_6";
+export type SubtopicId =
+  | "s_algebra" | "s_advanced" | "s_data" | "s_geometry"
+  | "s_craft" | "s_info" | "s_conventions" | "s_expression";
+export type StressId = "st_never" | "st_sometimes" | "st_always";
+
+/** The three optional answers. Any subset may be present. */
+export type Refinements = {
+  practice?: PracticeId;
+  subtopic?: SubtopicId;
+  stress?: StressId;
+};
+
+export type RefineQuestionId = keyof Refinements;
+
+export type RefineOption = Option & {
+  /** Only on sub-topic options: which section the sub-topic belongs to. */
+  section?: "math" | "rw";
+};
+
+export type RefineQuestion = {
+  id: RefineQuestionId;
+  label: string;
+  prompt: string;
+  help: string;
+  options: RefineOption[];
+};
+
+export type RefinedInfo = {
+  /** 70 + 10 per answered optional question (70–100). */
+  accuracy: number;
+  answered: number;
+  practice?: PracticeId;
+  subtopic?: { id: SubtopicId; label: string; section: "math" | "rw" };
+  stress?: StressId;
 };

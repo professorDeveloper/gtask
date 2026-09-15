@@ -1,6 +1,6 @@
 import { BASELINE, EFFORT, FOCUS, QUESTIONS, TARGET, TIMELINE } from "./questions";
 import { bandFor } from "./bands";
-import type { Answers, Move, Phase, Report, ScoreComponent } from "./types";
+import type { Answers, FocusSection, Move, Phase, Report, ScoreComponent } from "./types";
 
 /**
  * The rules. No model, no randomness — the same answers always produce the
@@ -17,16 +17,57 @@ const ASSUMED_BASELINE = 1050;
 
 const WEIGHTS = { proximity: 40, capacity: 38, habit: 22 } as const;
 
+/** Points added for the Q4 answer: two weak sections cost time, pace-only is a trainable skill. */
+export const FOCUS_ADJUSTMENT: Record<FocusSection, number> = { rw: 0, math: 0, both: -5, pace: 3 };
+
 const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n));
 const round = (n: number, step = 1) => Math.round(n / step) * step;
 
+/**
+ * Knobs the optional refinement questions turn. `NEUTRAL_MODIFIERS` reproduces
+ * the plain five-answer report exactly. Only `refine.ts` should build these.
+ */
+export type Modifiers = {
+  /** Multiplier applied to the raw score when the baseline is unmeasured. */
+  unmeasuredDiscount: number;
+  /** Points added to the raw score when the baseline is measured. */
+  measuredBonus: number;
+  /** Points added to the raw score for test-day pacing. */
+  pacingDelta: number;
+  /** Forces the pacing flag (and the timed-practice rules) on. */
+  forcePacing: boolean;
+  /** Multiplier on the hours the gap costs (a named weak skill is cheaper). */
+  hoursFactor: number;
+  /** Weeks moved out of the Rehearse phase into Close the gap. */
+  rehearseCut: number;
+  /** Named weak sub-topic, used to word the plan. */
+  subtopic: { label: string; section: "math" | "rw" } | null;
+};
+
+export const NEUTRAL_MODIFIERS: Modifiers = {
+  unmeasuredDiscount: 0.9,
+  measuredBonus: 0,
+  pacingDelta: 0,
+  forcePacing: false,
+  hoursFactor: 1,
+  rehearseCut: 0,
+  subtopic: null,
+};
+
+/** The five-answer report. */
 export function evaluate(answers: Answers): Report {
+  return evaluateWith(answers, NEUTRAL_MODIFIERS);
+}
+
+/** The report with refinement modifiers applied. Prefer `refine()` from ./refine. */
+export function evaluateWith(answers: Answers, mods: Modifiers): Report {
   const timeline = TIMELINE[answers[0] as keyof typeof TIMELINE];
   const baselineAnswer = BASELINE[answers[1] as keyof typeof BASELINE];
   const effort = EFFORT[answers[2] as keyof typeof EFFORT];
   const focusAnswer = FOCUS[answers[3] as keyof typeof FOCUS];
   const target = TARGET[answers[4] as keyof typeof TARGET].score;
 
+  const section: FocusSection = focusAnswer.section;
   const weeks = timeline.weeks;
   const hoursPerWeek = effort.hours;
   const measured = baselineAnswer.score !== null;
@@ -34,18 +75,19 @@ export function evaluate(answers: Answers): Report {
 
   const gap = Math.max(0, target - baseline);
   const budgetHours = round(weeks * hoursPerWeek);
-  const requiredHours = Math.max(round(gap * HOURS_PER_POINT), 8);
+  const requiredHours = Math.max(round(gap * HOURS_PER_POINT * mods.hoursFactor), 8);
 
-  /* Where the current pace actually lands, capped at the target. */
-  const pointsEarned = Math.min(gap, budgetHours / HOURS_PER_POINT);
-  const projected = round(Math.min(target, baseline + pointsEarned), 10);
+  /* Where the current pace actually lands: never below today, never past the target
+     (a student already above the target simply stays where they are). */
+  const pointsEarned = Math.min(gap, budgetHours / (HOURS_PER_POINT * mods.hoursFactor));
+  const projected = gap === 0 ? baseline : clamp(round(baseline + pointsEarned, 10), baseline, target);
   const shortfall = Math.max(0, target - projected);
 
   const proximity = clamp(1 - gap / 400, 0, 1);
   const capacity = clamp(budgetHours / requiredHours, 0, 1);
   const habit = clamp(hoursPerWeek / 10, 0, 1);
-  const pacingIssue = focusAnswer.section === "pace";
-  const focusPenalty = focusAnswer.section === "both" ? -5 : pacingIssue ? 3 : 0;
+  const pacingIssue = section === "pace" || mods.forcePacing;
+  const focusPenalty = FOCUS_ADJUSTMENT[section];
 
   const components: ScoreComponent[] = [
     {
@@ -74,9 +116,13 @@ export function evaluate(answers: Answers): Report {
     },
   ];
 
-  const raw = components.reduce((sum, c) => sum + c.weight * c.value, 0) + focusPenalty;
+  const raw =
+    components.reduce((sum, c) => sum + c.weight * c.value, 0) +
+    focusPenalty +
+    mods.pacingDelta +
+    (measured ? mods.measuredBonus : 0);
   /* An unmeasured baseline is an estimate, so the score is discounted. */
-  const readiness = clamp(Math.round(measured ? raw : raw * 0.9), 3, 99);
+  const readiness = clamp(Math.round(measured ? raw : raw * mods.unmeasuredDiscount), 3, 99);
   const band = bandFor(readiness);
   const weeklyNeed = clamp(Math.ceil(requiredHours / weeks), 3, 20);
 
@@ -95,12 +141,16 @@ export function evaluate(answers: Answers): Report {
     budgetHours,
     requiredHours,
     weeklyNeed,
-    focus: focusSplit(focusAnswer.section),
+    focus: focusSplit(section),
     components,
-    phases: phasesFor({ weeks, measured, weeklyNeed, section: focusAnswer.section }),
+    phases: phasesFor({
+      weeks, measured, weeklyNeed, pacing: pacingIssue,
+      rehearseCut: mods.rehearseCut, subtopic: mods.subtopic,
+    }),
     moves: movesFor({
       measured, gap, weeks, hoursPerWeek, weeklyNeed, requiredHours, budgetHours,
-      booked: timeline.booked, section: focusAnswer.section, shortfall, target, projected,
+      booked: timeline.booked, pacing: pacingIssue, shortfall, target, projected,
+      subtopic: mods.subtopic,
     }),
     flags: { unbooked: !timeline.booked, needsDiagnostic: !measured, pacingIssue },
   };
@@ -110,6 +160,9 @@ type ArchetypeInput = {
   measured: boolean; gap: number; weeks: number;
   hoursPerWeek: number; pacingIssue: boolean; shortfall: number;
 };
+
+/** A shortfall this small still counts as "works if nothing slips". */
+const BUILDER_SLACK = 50;
 
 function archetypeFor(i: ArchetypeInput): { archetype: string; verdict: string } {
   if (!i.measured)
@@ -153,18 +206,23 @@ function archetypeFor(i: ArchetypeInput): { archetype: string; verdict: string }
     verdict:
       i.shortfall === 0
         ? `The arithmetic works: ${i.weeks} weeks at ${i.hoursPerWeek} hours covers the gap with room to spare.`
-        : `A ${i.gap}-point gap with ${i.weeks} weeks and ${i.hoursPerWeek} hours a week — it works if nothing slips.`,
+        : i.shortfall <= BUILDER_SLACK
+          ? `A ${i.gap}-point gap with ${i.weeks} weeks and ${i.hoursPerWeek} hours a week — it works if nothing slips.`
+          : `A ${i.gap}-point gap with ${i.weeks} weeks and ${i.hoursPerWeek} hours a week leaves about ${i.shortfall} points uncovered. Something has to give.`,
   };
 }
 
-function focusSplit(section: string): Report["focus"] {
-  if (section === "rw") return { rw: 70, math: 30, label: "70% Reading & Writing / 30% Math" };
-  if (section === "math") return { rw: 30, math: 70, label: "70% Math / 30% Reading & Writing" };
-  if (section === "both") return { rw: 50, math: 50, label: "50 / 50, alternating days" };
-  return { rw: 50, math: 50, label: "Even split, but every session timed" };
+function focusSplit(section: FocusSection): Report["focus"] {
+  if (section === "rw") return { rw: 70, math: 30, label: "70% Reading & Writing / 30% Math", section };
+  if (section === "math") return { rw: 30, math: 70, label: "70% Math / 30% Reading & Writing", section };
+  if (section === "both") return { rw: 50, math: 50, label: "50 / 50, alternating days", section };
+  return { rw: 50, math: 50, label: "Even split, but every session timed", section };
 }
 
-function phasesFor(i: { weeks: number; measured: boolean; weeklyNeed: number; section: string }): Phase[] {
+function phasesFor(i: {
+  weeks: number; measured: boolean; weeklyNeed: number; pacing: boolean;
+  rehearseCut: number; subtopic: Modifiers["subtopic"];
+}): Phase[] {
   const phases: Phase[] = [];
   const diagnose = i.measured ? 0 : 1;
   if (diagnose) {
@@ -185,14 +243,16 @@ function phasesFor(i: { weeks: number; measured: boolean; weeklyNeed: number; se
     });
     return phases;
   }
-  const rehearse = clamp(Math.round(remaining * 0.3), 2, 6);
+  /* Students who have already sat many full tests need less rehearsal. */
+  const rehearse = Math.max(1, clamp(Math.round(remaining * 0.3), 2, 6) - i.rehearseCut);
   phases.push({
     name: "Close the gap",
     weeks: remaining - rehearse,
     hoursPerWeek: i.weeklyNeed,
-    detail:
-      i.section === "pace"
-        ? "Full sections against the clock, not untimed drills. Pace is the skill being trained."
+    detail: i.pacing
+      ? "Full sections against the clock, not untimed drills. Pace is the skill being trained."
+      : i.subtopic
+        ? `Start every week with ${i.subtopic.label}, drilled by skill tag. One full section test each weekend checks the transfer.`
         : "Drill the weak section by skill tag, one full section test each weekend to check the transfer.",
   });
   phases.push({
@@ -206,8 +266,8 @@ function phasesFor(i: { weeks: number; measured: boolean; weeklyNeed: number; se
 
 function movesFor(i: {
   measured: boolean; gap: number; weeks: number; hoursPerWeek: number; weeklyNeed: number;
-  requiredHours: number; budgetHours: number; booked: boolean; section: string;
-  shortfall: number; target: number; projected: number;
+  requiredHours: number; budgetHours: number; booked: boolean; pacing: boolean;
+  shortfall: number; target: number; projected: number; subtopic: Modifiers["subtopic"];
 }): Move[] {
   const moves: Move[] = [];
   if (!i.measured)
@@ -231,17 +291,21 @@ function movesFor(i: {
           body: `The gap needs about ${i.requiredHours} hours and your schedule allows ${i.budgetHours}. Protect the habit instead of adding to it.`,
         },
   );
-  moves.push(
-    i.section === "pace"
-      ? {
-          head: "Train the clock, not the content",
-          body: "Every drill timed, section-length, with the countdown visible. Accuracy you cannot reach in time does not score.",
-        }
-      : {
-          head: "Review misses the same day you make them",
-          body: "Tag each one by skill. A miss you never diagnosed is a miss you will make again on test day.",
-        },
-  );
+  if (i.pacing)
+    moves.push({
+      head: "Train the clock, not the content",
+      body: "Every drill timed, section-length, with the countdown visible. Accuracy you cannot reach in time does not score.",
+    });
+  else if (i.subtopic)
+    moves.push({
+      head: `Drill ${i.subtopic.label} first`,
+      body: "Open each session with it while you are fresh, and tag every miss by skill. Named weaknesses close fastest.",
+    });
+  else
+    moves.push({
+      head: "Review misses the same day you make them",
+      body: "Tag each one by skill. A miss you never diagnosed is a miss you will make again on test day.",
+    });
   if (!i.booked)
     moves.push({
       head: "Book a test date",

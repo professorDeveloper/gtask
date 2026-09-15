@@ -9,8 +9,7 @@ function subscribe(onChange: () => void) {
 
 /**
  * A header that is flush with the page until the page moves under it, then
- * lifts one elevation step. Height signals "this is on top of the content",
- * so it should only appear once there is content underneath.
+ * lifts one elevation step (the e1 hairline ring is the only edge).
  */
 export function StickyBar({ children, className = "" }: { children: React.ReactNode; className?: string }) {
   const scrolled = useSyncExternalStore(
@@ -21,10 +20,8 @@ export function StickyBar({ children, className = "" }: { children: React.ReactN
 
   return (
     <header
-      className={`sticky top-0 z-50 border-b backdrop-blur-xl transition-[background-color,border-color,box-shadow] duration-300 ${
-        scrolled
-          ? "border-line bg-paper/85 shadow-[var(--elev-2)]"
-          : "border-transparent bg-paper"
+      className={`sticky top-0 z-50 backdrop-blur-xl transition-[background-color,box-shadow] duration-300 ${
+        scrolled ? "bg-paper/80 elev-1" : "bg-paper/0"
       } ${className}`}
     >
       {children}
