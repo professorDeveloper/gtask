@@ -39,7 +39,7 @@ export function MethodLab() {
         <div className="lg:border-r lg:border-line">
           {/* phones: the score stays in sight while the controls scroll under it,
               and lets go when the full result below takes over */}
-          <div className="sticky top-16 z-10 rounded-t-card border-b border-line bg-surface/90 px-4 py-3 backdrop-blur-xl lg:hidden">
+          <div className="sticky top-16 z-10 rounded-t-card border-b border-line bg-surface/[0.97] px-4 py-3 lg:hidden">
             <CompactResult report={report} />
           </div>
 

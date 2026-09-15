@@ -30,7 +30,7 @@ export function SharePreview({
   countdown: string;
 }) {
   return (
-    <section className="mesh grain">
+    <section className="mesh grain cv-share">
       <div className="mx-auto max-w-6xl px-5 py-16 md:py-24">
         <SectionHead
           eyebrow="What comes back · sample"

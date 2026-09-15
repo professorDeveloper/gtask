@@ -7,7 +7,12 @@ const gabarito = Gabarito({ subsets: ["latin"], variable: "--font-gabarito", dis
 const manrope = Manrope({ subsets: ["latin"], variable: "--font-manrope", display: "swap" });
 const mono = JetBrains_Mono({ subsets: ["latin"], variable: "--font-mono-jb", display: "swap" });
 
+const SHARE_TITLE = "GTask — Find out if your SAT plan actually adds up";
+const SHARE_DESCRIPTION =
+  "Five questions, sixty seconds. Your points gap turned into study hours, scored by simple rules you can inspect — not AI.";
+
 export const metadata: Metadata = {
+  /* absolute URLs for og:image and share links; the /opengraph-image file supplies the picture */
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "https://gtask.vercel.app"),
   title: {
     default: "GTask — SAT Readiness Check",
@@ -15,13 +20,20 @@ export const metadata: Metadata = {
   },
   description:
     "Five questions, sixty seconds. GTask measures the gap between the score you have and the score your university expects — and tells you what that gap costs in study hours.",
+  applicationName: "GTask",
   openGraph: {
-    title: "GTask — SAT Readiness Check",
-    description: "Five questions. One honest read of your SAT gap, scored by rules you can inspect.",
+    title: SHARE_TITLE,
+    description: SHARE_DESCRIPTION,
+    url: "/",
     type: "website",
     siteName: "GTask",
+    locale: "en_US",
   },
-  twitter: { card: "summary_large_image" },
+  twitter: {
+    card: "summary_large_image",
+    title: SHARE_TITLE,
+    description: SHARE_DESCRIPTION,
+  },
 };
 
 export const viewport: Viewport = {

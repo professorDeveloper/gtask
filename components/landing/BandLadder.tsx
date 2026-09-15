@@ -49,7 +49,7 @@ function Step({ band, index, progress }: { band: Band; index: number; progress: 
   const confetti = band.key === "sharpening" || band.key === "ready";
 
   return (
-    <motion.li style={{ y, opacity }} className={`relative pl-9 md:pl-0 ${STAIR[index]}`}>
+    <motion.li style={{ y, opacity }} className={`relative pl-9 will-change-transform md:pl-0 ${STAIR[index]}`}>
       <motion.span
         style={{ scale: dot }}
         className={`absolute top-6 left-0 h-6 w-6 rounded-full border-4 border-paper md:hidden ${FILL[band.tone]}`}

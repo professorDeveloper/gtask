@@ -224,6 +224,10 @@ html.lenis, html.lenis body { height: auto; }
   opacity: .18; mix-blend-mode: soft-light;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 }
+/* touch devices: skip the soft-light blend, which is recomposited on every scroll frame */
+@media (hover: none) {
+  .grain::after { mix-blend-mode: normal; opacity: .06; }
+}
 .text-mesh {
   background: linear-gradient(100deg, var(--brand) 10%, var(--accent-2) 90%);
   -webkit-background-clip: text; background-clip: text; color: transparent;
@@ -352,6 +356,29 @@ html.lenis, html.lenis body { height: auto; }
 .step-slider:focus-visible { outline: none; }
 .step-slider:focus-visible::-webkit-slider-thumb { box-shadow: var(--focus-ring); }
 .step-slider:focus-visible::-moz-range-thumb { box-shadow: var(--focus-ring); }
+/* Tick labels are 16px of text; the hit area is 44px, invisible. It reaches 8px
+   up (below the 28px thumb, which ends 8px above the input's bottom) and 20px
+   down into the gap before the next control, and is never narrower than 44px. */
+.step-tick::before {
+  content: ""; position: absolute; top: -8px; height: 44px;
+  left: min(-8px, calc((100% - 44px) / 2)); right: min(-8px, calc((100% - 44px) / 2));
+}
+/* --- landing performance --------------------------------------------- */
+/* Hero headline word reveal: opacity + transform only (no per-word blur, which
+   left eight filter layers on the page), compositor-driven from first paint. */
+@keyframes hero-word { from { opacity: 0; transform: translateY(.45em); } }
+.hero-word { animation: hero-word .7s var(--ease-out-soft) both; animation-delay: calc(80ms + var(--i, 0) * 60ms); }
+/* Gap story scroll length: ~1.5k px on a 390×844 phone, the longer dwell from md up. */
+.gapstory-track { height: 180svh; }
+@media (min-width: 768px) { .gapstory-track { height: 300svh; } }
+/* scroll-linked fills slide on their own layers */
+.gapstory-fill { will-change: transform; }
+/* Below-the-fold, non-sticky sections skip rendering until near the viewport.
+   `auto` remembers the real size once rendered, so jumps and scroll stay stable. */
+.cv-share { content-visibility: auto; contain-intrinsic-size: auto 1420px; }
+@media (min-width: 1024px) { .cv-share { contain-intrinsic-size: auto 900px; } }
+.cv-final-cta { content-visibility: auto; contain-intrinsic-size: auto 540px; }
+@media (min-width: 768px) { .cv-final-cta { contain-intrinsic-size: auto 710px; } }
 /* ==== end area: landing ==== */
 
 /* ==== area: check ==== */

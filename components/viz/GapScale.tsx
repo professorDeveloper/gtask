@@ -402,10 +402,11 @@ export function GapLegend({ items, size = "md", className = "" }: { items: Legen
   return (
     <dl className={`grid grid-cols-3 gap-2 sm:gap-3 ${className}`} aria-hidden>
       {items.map((it) => (
-        <div key={it.key} className="min-w-0">
-          <dt className={`flex items-center gap-1.5 text-ink-3 ${size === "lg" ? "text-caption" : "text-micro"}`}>
+        <div key={it.key} className="flex min-w-0 flex-col justify-between">
+          {/* labels wrap rather than truncate on narrow phones; values stay on one baseline */}
+          <dt className={`flex items-center gap-1.5 text-ink-3 ${size === "lg" ? "text-caption leading-tight" : "text-micro"}`}>
             {it.swatch}
-            <span className="truncate">{it.label}</span>
+            <span className="min-w-0">{it.label}</span>
           </dt>
           <dd className={`tnum mt-1 font-display text-title font-bold tracking-[-0.03em] ${it.tone ?? "text-ink"}`}>{it.value}</dd>
         </div>

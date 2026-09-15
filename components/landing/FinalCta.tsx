@@ -26,7 +26,7 @@ export function FinalCta() {
   ];
 
   return (
-    <section className="px-4 pb-16 md:px-5 md:pb-24">
+    <section className="cv-final-cta px-4 pb-16 md:px-5 md:pb-24">
       <div
         ref={ref}
         className="mesh-strong grain relative mx-auto max-w-6xl overflow-hidden rounded-[28px] px-6 py-16 text-center elev-3 md:py-24"
@@ -35,7 +35,7 @@ export function FinalCta() {
           <motion.span
             key={i}
             aria-hidden
-            className={`pointer-events-none absolute ${s.className}`}
+            className={`pointer-events-none absolute ${s.className} ${reduce ? "" : "will-change-transform"}`}
             style={reduce ? undefined : { y: drift[i] }}
           >
             <Icon name="sparkle" size={s.size} weight="fill" className="text-sunny" />

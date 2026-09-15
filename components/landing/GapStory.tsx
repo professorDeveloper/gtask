@@ -29,10 +29,14 @@ export function GapStory({ sample }: { sample: Report }) {
   const pr = scalePct(sample.projected, MIN, MAX);
   const t = scalePct(sample.target, MIN, MAX);
 
-  /* stacked layers from the left edge: each starts hidden under the one before it */
-  const baseW = useTransform(p, [0.04, 0.26], ["0%", `${b}%`]);
-  const paceW = useTransform(p, [0.29, 0.3, 0.5], ["0%", `${b}%`, `${pr}%`]);
-  const gapW = useTransform(p, [0.53, 0.54, 0.74], ["0%", `${pr}%`, `${t}%`]);
+  /* stacked layers from the left edge: each starts hidden under the one before it.
+     Each fill is laid out at its final width once and slid in from the left with
+     translateX (compositor-only) instead of animating width (layout every frame);
+     the track's overflow-hidden clips the part still off to the left. */
+  const slid = (from: number, to: number) => `${(from / to - 1) * 100}%`;
+  const baseX = useTransform(p, [0.04, 0.26], ["-100%", "0%"]);
+  const paceX = useTransform(p, [0.29, 0.3, 0.5], ["-100%", slid(b, pr), "0%"]);
+  const gapX = useTransform(p, [0.53, 0.54, 0.74], ["-100%", slid(pr, t), "0%"]);
   const todayOpacity = useTransform(p, [0.14, 0.24], [0, 1]);
   const paceOpacity = useTransform(p, [0.4, 0.5], [0, 1]);
   /* before the plan the whole gap is missing; the pace eats into it as it draws */
@@ -67,8 +71,9 @@ export function GapStory({ sample }: { sample: Report }) {
 
   return (
     <section aria-labelledby="gap-title" className="relative">
-      <div ref={ref} className={reduce ? "" : "h-[300svh]"}>
-        <div className={reduce ? "py-16" : "sticky top-16 flex h-[calc(100svh-4rem)] items-center"}>
+      {/* phones: ~80svh of scroll drives the drawing (the section is ~1.5k px at 390×844); md+ keeps a longer dwell */}
+      <div ref={ref} className={reduce ? "" : "gapstory-track"}>
+        <div className={reduce ? "py-16" : "sticky top-16 flex h-[calc(100svh-4rem)] items-center [contain:layout]"}>
           <div className="mx-auto w-full max-w-6xl px-5">
             <p className="text-micro font-semibold tracking-[0.08em] text-ink-2 uppercase">The gap, drawn</p>
             <h2 id="gap-title" className="mt-2 flex flex-wrap items-baseline gap-x-3 font-display font-bold">
@@ -87,9 +92,9 @@ export function GapStory({ sample }: { sample: Report }) {
             <div className="mt-6 rounded-card border border-line bg-surface p-5 elev-2 sm:p-8" aria-hidden>
               <div ref={barRef} className="relative select-none" style={{ height: G.height }}>
                 <div className="well absolute inset-x-0 overflow-hidden rounded-full" style={{ top: G.trackTop, height: G.track }}>
-                  <motion.div className="gapbar-short absolute inset-y-0 left-0 rounded-full" style={{ width: gapW }} />
-                  <motion.div className="gapbar-pace absolute inset-y-0 left-0 rounded-full" style={{ width: paceW }} />
-                  <motion.div className="gapbar-today absolute inset-y-0 left-0 rounded-full" style={{ width: baseW }} />
+                  <motion.div className="gapbar-short gapstory-fill absolute inset-y-0 left-0 rounded-full" style={{ width: `${t}%`, x: gapX }} />
+                  <motion.div className="gapbar-pace gapstory-fill absolute inset-y-0 left-0 rounded-full" style={{ width: `${pr}%`, x: paceX }} />
+                  <motion.div className="gapbar-today gapstory-fill absolute inset-y-0 left-0 rounded-full" style={{ width: `${b}%`, x: baseX }} />
                 </div>
                 <Stem tone="target" pct={t} top={G.lane} height={G.trackTop - G.lane + G.track + 5} strong />
                 {specs.map((s, i) => (

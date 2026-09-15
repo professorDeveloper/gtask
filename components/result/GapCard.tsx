@@ -65,7 +65,7 @@ export function GapCard({ report }: { report: Report }) {
           suffix="h"
           label="needed a week"
           tone={extra > 0 ? "text-gap-ink" : "text-ready-ink"}
-          chip={extra > 0 ? `you: ${report.hoursPerWeek}h` : "you have it"}
+          chip={`you: ${report.hoursPerWeek}h`}
           chipTone={extra > 0 ? "bg-gap-soft text-gap-ink" : "bg-ready-soft text-ready-ink"}
         />
       </dl>
@@ -93,7 +93,7 @@ function Stat({
       </dd>
       <dt className="order-2 mt-2 text-caption leading-snug text-ink-3">{label}</dt>
       {chip && (
-        <span className={`order-3 mt-2 inline-flex w-fit items-center rounded-full px-2 py-0.5 text-micro font-semibold ${chipTone}`}>
+        <span className={`order-3 mt-2 inline-flex w-fit items-center rounded-full px-1.5 py-0.5 text-micro font-semibold whitespace-nowrap ${chipTone}`}>
           {chip}
         </span>
       )}

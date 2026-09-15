@@ -1,8 +1,9 @@
 "use client";
 
-import { useRef, useState } from "react";
-import { AnimatePresence, motion, useMotionValueEvent, useScroll } from "motion/react";
+import { useEffect, useRef, useState, type ContextType } from "react";
+import { AnimatePresence, motion, PresenceContext, useMotionValueEvent, useScroll } from "motion/react";
 import { Icon } from "@/components/ui/Icon";
+import { JUMP_EVENT, JUMP_LANDED_EVENT } from "@/components/ui/jumpTo";
 import { SPRING } from "@/components/ui/motion";
 import { QUESTIONS } from "@/lib/readiness/questions";
 import type { Answers, Report } from "@/lib/readiness/types";
@@ -19,16 +20,64 @@ const WHY = [
 const STEPS = QUESTIONS.length + 1;
 
 /**
+ * A present, never-exiting presence context for the story stage. It is always
+ * provided (motion's hooks require it to stay non-null for a component's life);
+ * only `initial` changes: false blocks mount animations for the remount after a jump.
+ */
+const LIVE: NonNullable<ContextType<typeof PresenceContext>> = {
+  id: "story-stage",
+  initial: undefined,
+  isPresent: true,
+  custom: undefined,
+  onExitComplete: () => {},
+  register: () => () => {},
+};
+const SNAP = { ...LIVE, initial: false as const };
+
+/**
  * Scroll story: a phone pinned in place while the page scrolls, stepping
  * through the five questions and landing on the report.
  */
 export function StoryFiveQuestions({ answers, sample }: { answers: Answers; sample: Report }) {
   const ref = useRef<HTMLDivElement>(null);
   const [step, setStep] = useState(0);
+  /*
+   * Bumped when a section jump moves the page. The stage below is keyed by it,
+   * so it remounts at the new step with initial animations blocked: no exit of
+   * the old step, no spring, no colour transition finishing after the fade-in.
+   */
+  const [epoch, setEpoch] = useState(0);
+  const [snap, setSnap] = useState(false);
+  const jumping = useRef(false);
+  const stepRef = useRef(0);
   const { scrollYProgress } = useScroll({ target: ref, offset: ["start start", "end end"] });
+
+  const remount = () => {
+    setEpoch((e) => e + 1);
+    setSnap(true);
+    requestAnimationFrame(() => requestAnimationFrame(() => setSnap(false)));
+  };
+
   useMotionValueEvent(scrollYProgress, "change", (p) => {
-    setStep(Math.min(STEPS - 1, Math.max(0, Math.floor(p * STEPS))));
+    const next = Math.min(STEPS - 1, Math.max(0, Math.floor(p * STEPS)));
+    if (next === stepRef.current) return;
+    stepRef.current = next;
+    if (jumping.current) remount();
+    setStep(next);
   });
+  useEffect(() => {
+    const onJump = () => { jumping.current = true; };
+    const onLanded = () => {
+      jumping.current = false;
+      remount();
+    };
+    window.addEventListener(JUMP_EVENT, onJump);
+    window.addEventListener(JUMP_LANDED_EVENT, onLanded);
+    return () => {
+      window.removeEventListener(JUMP_EVENT, onJump);
+      window.removeEventListener(JUMP_LANDED_EVENT, onLanded);
+    };
+  }, []);
 
   return (
     <section id="how" className="scroll-mt-16 pt-16 md:pt-24">
@@ -46,13 +95,19 @@ export function StoryFiveQuestions({ answers, sample }: { answers: Answers; samp
 
       <div ref={ref} className="story-track relative">
         <div className="sticky top-16 flex h-[calc(100svh-4rem)] items-center">
-          <div
-            className="mx-auto flex w-full max-w-6xl flex-col items-center gap-5 px-5 lg:grid lg:grid-cols-[1fr_auto] lg:gap-16"
-            aria-hidden
-          >
-            <StepText step={step} />
-            <PhoneMockup step={step} answers={answers} sample={sample} />
-          </div>
+          {/* `initial: false` in presence context makes every motion element mounted under it
+              start at its animate state; provided only for the remount frame, so step changes
+              while scrolling keep their mount animations */}
+          <PresenceContext.Provider value={snap ? SNAP : LIVE}>
+            <div
+              key={epoch}
+              className="mx-auto flex w-full max-w-6xl flex-col items-center gap-5 px-5 lg:grid lg:grid-cols-[1fr_auto] lg:gap-16"
+              aria-hidden
+            >
+              <StepText step={step} />
+              <PhoneMockup step={step} answers={answers} sample={sample} />
+            </div>
+          </PresenceContext.Provider>
         </div>
       </div>
     </section>

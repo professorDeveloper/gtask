@@ -11,6 +11,7 @@ import { daysToTest } from "@/lib/readiness/countdown";
 import { refine } from "@/lib/readiness/refine";
 import type { SessionStats as Stats } from "@/lib/readiness/session";
 import type { Answers, Refinements } from "@/lib/readiness/types";
+import { formatDay } from "./CountdownChip";
 import { GapCard } from "./GapCard";
 import { NextMoves, PlanPhases } from "./PlanPhases";
 import { RefineCard, type SaveState } from "./RefineCard";
@@ -22,7 +23,6 @@ import { BAND_ICON, TONE } from "./tones";
 import { Transparency } from "./Transparency";
 import { WeekCalendar } from "./WeekCalendar";
 
-const dateFmt = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
 
 /**
  * The result page. Owns the optional refinements: each change re-scores
@@ -137,7 +137,7 @@ export function ReportView({
               </Button>
               <p className="flex items-center gap-2 text-caption text-ink-3">
                 <Icon name="lock" size={15} />
-                Checked {dateFmt.format(new Date(createdAt))} · saved anonymously
+                Checked {formatDay(createdAt, true)} · saved anonymously
               </p>
             </div>
           </div>

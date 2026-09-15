@@ -114,7 +114,7 @@ function Tile({ icon, label, value, sub }: { icon: IconName; label: string; valu
         <span className="leading-tight">{label}</span>
       </dt>
       <dd className="tnum order-1 font-display text-title leading-tight font-bold tracking-[-0.03em] text-ink">{value}</dd>
-      {sub && <dd className="order-3 truncate text-micro text-ink-3">{sub}</dd>}
+      {sub && <dd className="order-3 mt-0.5 truncate text-micro font-semibold text-ink-2">{sub}</dd>}
     </div>
   );
 }

@@ -5,7 +5,9 @@ import { useId } from "react";
 /**
  * A slider over an ordered set of choices: a native range input (keyboard,
  * screen readers and touch for free) with a tick label under every stop.
- * The track is 44px tall so it is an easy thumb target on a phone.
+ * The track is 44px tall so it is an easy thumb target on a phone; each tick
+ * label carries an invisible 44px hit area (see .step-tick) that stays clear
+ * of the thumb.
  */
 export function StepSlider<T extends string>({
   label, value, options, onChange, className = "",
@@ -46,7 +48,7 @@ export function StepSlider<T extends string>({
             type="button"
             tabIndex={-1}
             onClick={() => onChange(o.id)}
-            className={`absolute top-0 whitespace-nowrap ${i === index ? "font-semibold text-ink" : ""} ${
+            className={`step-tick absolute top-0 cursor-pointer whitespace-nowrap ${i === index ? "font-semibold text-ink" : ""} ${
               i === 0 ? "left-0" : i === options.length - 1 ? "right-0" : "-translate-x-1/2"
             }`}
             style={i === 0 || i === options.length - 1 ? undefined : { left: `${(i / last) * 100}%` }}

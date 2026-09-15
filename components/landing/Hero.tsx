@@ -64,9 +64,13 @@ export function Hero({ sample }: { sample: Report }) {
   );
 }
 
-/** The headline rises word by word; screen readers get the sentence once. */
+/**
+ * The headline rises word by word; screen readers get the sentence once.
+ * A CSS animation (opacity + transform only, no per-word blur) so it runs on
+ * the compositor from first paint instead of waiting for hydration; the
+ * global reduced-motion rule collapses it.
+ */
 function Headline() {
-  const reduce = usePrefersReducedMotion();
   const words = [...HEADLINE.split(" ").map((w) => ({ w, accent: false })), ...ACCENT.split(" ").map((w) => ({ w, accent: true }))];
   return (
     <h1 className="mt-6 max-w-[14ch] text-display font-bold">
@@ -74,15 +78,13 @@ function Headline() {
       <span aria-hidden>
         {words.map(({ w, accent }, i) => (
           <span key={i}>
-            <motion.span
+            <span
               data-reveal
-              className={`inline-block ${accent ? "text-mesh pr-[0.04em]" : ""}`}
-              initial={reduce ? false : { opacity: 0, y: "0.45em", filter: "blur(6px)" }}
-              animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-              transition={{ ...SPRING.gentle, delay: 0.08 + i * 0.06 }}
+              className={`hero-word inline-block ${accent ? "text-mesh pr-[0.04em]" : ""}`}
+              style={{ ["--i" as string]: i }}
             >
               {w}
-            </motion.span>{" "}
+            </span>{" "}
           </span>
         ))}
       </span>
@@ -114,7 +116,11 @@ function SampleCard({ sample }: { sample: Report }) {
   ];
 
   return (
-    <motion.div ref={ref} style={reduce ? undefined : { y: parallax }} className="relative [perspective:1200px] lg:pl-2">
+    <motion.div
+      ref={ref}
+      style={reduce ? undefined : { y: parallax }}
+      className={`relative [perspective:1200px] lg:pl-2 ${reduce ? "" : "will-change-transform"}`}
+    >
       <motion.div
         initial={reduce ? false : { opacity: 0, y: 32, scale: 0.97 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}

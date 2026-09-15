@@ -70,30 +70,42 @@ export function SiteNav() {
   );
 }
 
-/** The section currently crossing the upper part of the viewport. */
+/**
+ * The linked section under a probe line 40% down the viewport, or null when the
+ * line is over anything else (the hero, the gap story, the share preview, the
+ * "under the hood" section, the final CTA), so the pill never claims a section
+ * the reader has already left.
+ */
 function useActiveSection(): string | null {
   const [active, setActive] = useState<string | null>(null);
   useEffect(() => {
+    /* which linked sections currently cross the probe line, in page order */
+    const crossing = new Map<string, boolean>(LINKS.map((l) => [l.id, false]));
+    const current = () => LINKS.find((l) => crossing.get(l.id))?.id ?? null;
+
     /* a jump names its destination up front; observer updates wait until it has landed */
     let heldUntil = 0;
+    let release = 0;
     const onJump = (e: Event) => {
       setActive((e as CustomEvent<string>).detail);
       heldUntil = performance.now() + 600;
+      window.clearTimeout(release);
+      release = window.setTimeout(() => setActive(current()), 620);
     };
     window.addEventListener(JUMP_EVENT, onJump);
 
     const els = LINKS.map((l) => document.getElementById(l.id)).filter((el): el is HTMLElement => !!el);
     const io = new IntersectionObserver(
       (entries) => {
-        if (performance.now() < heldUntil) return;
-        const hit = entries.filter((e) => e.isIntersecting).sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)[0];
-        if (hit) setActive(hit.target.id);
+        for (const e of entries) crossing.set(e.target.id, e.isIntersecting);
+        if (performance.now() >= heldUntil) setActive(current());
       },
-      { rootMargin: "-40% 0px -55% 0px" },
+      { rootMargin: "-40% 0px -59% 0px" },
     );
     els.forEach((el) => io.observe(el));
     return () => {
       io.disconnect();
+      window.clearTimeout(release);
       window.removeEventListener(JUMP_EVENT, onJump);
     };
   }, []);

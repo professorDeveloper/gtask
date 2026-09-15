@@ -10,6 +10,9 @@ function subscribe(onChange: () => void) {
 /**
  * A header that is flush with the page until the page moves under it, then
  * lifts one elevation step (the e1 hairline ring is the only edge).
+ * The frosted blur is for pointer devices only: on phones a sticky
+ * backdrop-filter re-samples the page every scroll frame, so touch gets a
+ * near-solid paper instead.
  */
 export function StickyBar({ children, className = "" }: { children: React.ReactNode; className?: string }) {
   const scrolled = useSyncExternalStore(
@@ -20,8 +23,8 @@ export function StickyBar({ children, className = "" }: { children: React.ReactN
 
   return (
     <header
-      className={`sticky top-0 z-50 backdrop-blur-xl transition-[background-color,box-shadow] duration-300 ${
-        scrolled ? "bg-paper/80 elev-1" : "bg-paper/0"
+      className={`sticky top-0 z-50 transition-[background-color,box-shadow] duration-300 [@media(hover:hover)]:backdrop-blur-xl ${
+        scrolled ? "bg-paper/95 elev-1 [@media(hover:hover)]:bg-paper/80" : "bg-paper/0"
       } ${className}`}
     >
       {children}

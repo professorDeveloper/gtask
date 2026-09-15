@@ -1,9 +1,21 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useSyncExternalStore } from "react";
 import Lenis from "lenis";
 import { usePrefersReducedMotion } from "./motion";
 import { jumpTo, registerLenis } from "./jumpTo";
+
+/* Lenis only helps a mouse wheel. Touch screens keep native momentum scrolling
+   (iOS Safari fights JS-driven scroll, and a rAF loop costs battery for nothing). */
+const FINE_POINTER = "(hover: hover) and (pointer: fine)";
+function subscribeFine(cb: () => void) {
+  const mq = window.matchMedia(FINE_POINTER);
+  mq.addEventListener("change", cb);
+  return () => mq.removeEventListener("change", cb);
+}
+function useFinePointer() {
+  return useSyncExternalStore(subscribeFine, () => window.matchMedia(FINE_POINTER).matches, () => false);
+}
 
 /**
  * Smooth wheel scrolling for the landing page. Not mounted globally — render
@@ -11,20 +23,25 @@ import { jumpTo, registerLenis } from "./jumpTo";
  * the window, so motion's useScroll/useTransform work unchanged. In-page
  * `#anchor` links are NOT smoothed: they use `jumpTo`, which places the page
  * at the section instantly behind a short fade, so scroll stories are never
- * dragged through their timelines. Disabled entirely under reduced motion.
+ * dragged through their timelines. Disabled under reduced motion and on
+ * touch / coarse-pointer devices.
  */
 export function SmoothScroll({ children }: { children?: React.ReactNode }) {
   const reduce = usePrefersReducedMotion();
+  const fine = useFinePointer();
 
   useEffect(() => {
-    if (reduce) return;
+    if (reduce || !fine) {
+      registerLenis(null);
+      return;
+    }
     const lenis = new Lenis({ autoRaf: true, lerp: 0.12 });
     registerLenis(lenis);
     return () => {
       registerLenis(null);
       lenis.destroy();
     };
-  }, [reduce]);
+  }, [reduce, fine]);
 
   /* deep links (/#faq): land on the section without animating through the page */
   useEffect(() => {

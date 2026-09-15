@@ -13,6 +13,12 @@ const OUT_MS = 140;
 const IN_MS = 260;
 /** Fired on window when a jump starts, so the nav can mark the destination at once. */
 export const JUMP_EVENT = "gtask:jump";
+/**
+ * Fired on window once the page has been placed and scroll listeners have
+ * settled, right before the content fades back in. Scroll-linked stories use
+ * the pair to snap to their new state instead of animating from the old one.
+ */
+export const JUMP_LANDED_EVENT = "gtask:jump-landed";
 
 let lenis: Lenis | null = null;
 let jumpToken = 0;
@@ -64,22 +70,29 @@ export async function jumpTo(id: string, { animate = true, focus = true, updateH
   for (const el of els) el.getAnimations().forEach((a) => a.cancel());
 
   if (els.length) {
-    await animateAll(els, [{ opacity: 1, filter: "blur(0px)" }, { opacity: 0, filter: "blur(6px)" }], OUT_MS, "ease-in");
+    await animateAll(els, [{ opacity: 1 }, { opacity: 0 }], OUT_MS, "ease-in");
     if (token !== jumpToken) return;
   }
 
   place(section);
   if (focus) focusHeading(section);
-  if (!els.length) return;
+  const landed = () => {
+    if (token === jumpToken) window.dispatchEvent(new CustomEvent(JUMP_LANDED_EVENT, { detail: id }));
+  };
+  if (!els.length) {
+    void frame().then(frame).then(landed);
+    return;
+  }
 
   /* let scroll listeners (motion's useScroll, the sticky stories) settle while hidden */
   await frame();
   await frame();
   if (token !== jumpToken) return;
+  landed();
 
   for (const el of els) el.getAnimations().forEach((a) => a.cancel());
-  await animateAll(els, [{ opacity: 0, filter: "blur(6px)" }, { opacity: 1, filter: "blur(0px)" }], IN_MS, "cubic-bezier(0.22, 1, 0.36, 1)");
-  /* drop the filled end state so no filter lingers on the page (it would break fixed children) */
+  await animateAll(els, [{ opacity: 0 }, { opacity: 1 }], IN_MS, "cubic-bezier(0.22, 1, 0.36, 1)");
+  /* drop the fill-forwards animations so no inline animated state lingers on the page */
   if (token === jumpToken) for (const el of els) el.getAnimations().forEach((a) => a.cancel());
 }
 
