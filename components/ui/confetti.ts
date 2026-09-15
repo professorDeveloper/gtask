@@ -51,6 +51,12 @@ export async function celebrate(band: BandKey): Promise<boolean> {
   return true;
 }
 
+/** Clears any particles still falling, e.g. before the screen underneath them changes. */
+export async function clearConfetti(): Promise<void> {
+  if (typeof window === "undefined") return;
+  (await load()).reset();
+}
+
 /**
  * A small burst for micro-wins (answering a refinement, finishing a step).
  * `origin` is in viewport fractions; pass an element to burst from its centre.

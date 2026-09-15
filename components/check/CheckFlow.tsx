@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
 import { submitCheck } from "@/app/actions";
-import { burst } from "@/components/ui/confetti";
+import { burst, clearConfetti } from "@/components/ui/confetti";
 import { Button } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
 import { LogoLink } from "@/components/ui/Logo";
@@ -74,6 +74,7 @@ export function CheckFlow() {
     });
     setStatus("scoring");
     dismissToast(WELCOME_TOAST);
+    void clearConfetti();
     try {
       submissionId.current ??= crypto.randomUUID();
       const { id } = await submitCheck(snapshot.answers, checkSession.stats(), submissionId.current);
